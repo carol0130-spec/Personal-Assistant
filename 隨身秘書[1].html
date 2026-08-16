@@ -1,0 +1,2846 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>CL 隨身秘書</title>
+<link rel="icon" id="favicon" href="">
+<!-- 加入手機主畫面／PWA 所需設定：manifest 提供 Android 的圖示與名稱，
+     apple-touch-icon 與下面幾個 meta 提供 iOS 的圖示與全螢幕體驗。
+     這些檔案（manifest.json、icons/*.png）需要跟這個 HTML 放在同一個
+     GitHub Pages 網站的相對路徑下才會生效，發布前參考交付時附上的說明。 -->
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="隨身秘書">
+<meta name="theme-color" content="#F2EEE7">
+<style>
+  :root{
+    --paper:#F2EEE7; --card:#FFFFFF; --ink:#3A4048; --ink-muted:#6B6459; --ink-faint:#9C9488; --rule:#E2DDD1;
+    --mark-c:#3A4854; --mark-l:#C4962E;
+    --urgent:#C0392B; --urgent-bg:#FBDCD6; --overdue:#8B1A1A; --overdue-bg:#F5CFC7;
+    --soon:#A3781E; --soon-bg:#F5EAD2; --calm:#5C7A6E; --calm-bg:#E5EEE9;
+    --info:#5A7085; --info-bg:#E7ECF0; --thsr:#8A5A2E; --thsr-bg:#F3E8D9;
+    --vip:#A3781E; --vip-bg:#F5EAD2;
+    --nav-bg:#FFFFFF; --shadow: 0 -1px 0 rgba(0,0,0,0.06);
+  }
+  [data-theme="dark"]{
+    --paper:#241E1A; --card:#2F2823; --ink:#EDE6DA; --ink-muted:#B7ADA0; --ink-faint:#847A6E; --rule:#3E362F;
+    --mark-c:#B98CA0; --mark-l:#D9AE5C;
+    --urgent:#FF6B57; --urgent-bg:#4A2620; --overdue:#FF3B30; --overdue-bg:#4D1C18;
+    --soon:#D9B66C; --soon-bg:#3A331F; --calm:#8FAA9C; --calm-bg:#243430;
+    --info:#93AAC0; --info-bg:#232B33; --thsr:#D3AD73; --thsr-bg:#332A1C;
+    --vip:#D9B66C; --vip-bg:#3A331F;
+    --nav-bg:#2F2823; --shadow: 0 -1px 0 rgba(0,0,0,0.3);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;}
+  body{
+    background:var(--paper);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    padding-bottom:76px;
+    transition:background .2s ease,color .2s ease;
+  }
+  .wrap{max-width:520px;margin:0 auto;padding:0 16px;}
+
+  /* ---- top bar ---- */
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 6px;max-width:520px;margin:0 auto;}
+  .brand{display:flex;align-items:center;gap:9px;}
+  .brand svg{width:30px;height:30px;flex-shrink:0;}
+  .brand-name{font-family:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;font-weight:700;font-size:18px;}
+  .icon-btn{width:38px;height:38px;border-radius:50%;background:var(--card);border:1px solid var(--rule);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
+  .icon-btn svg{width:18px;height:18px;}
+  .top-actions{display:flex;gap:8px;}
+
+  .datebar{font-family:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;font-style:italic;font-size:13px;color:var(--ink-faint);padding:0 16px 10px;max-width:520px;margin:0 auto;}
+
+  /* ---- bottom nav ---- */
+  .bottomnav{
+    position:fixed;left:0;right:0;bottom:0;background:var(--nav-bg);border-top:1px solid var(--rule);
+    box-shadow:var(--shadow);display:flex;justify-content:space-around;padding:6px 4px calc(6px + env(safe-area-inset-bottom));z-index:40;
+  }
+  .navitem{
+    display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 10px;min-width:60px;min-height:48px;
+    color:var(--ink-faint);cursor:pointer;border-radius:10px;
+  }
+  .navitem.active{color:var(--mark-c);}
+  .navitem svg{width:22px;height:22px;}
+  .nav-icon-wrap{position:relative;display:inline-block;}
+  .nav-badge{position:absolute;top:-5px;right:-9px;background:var(--urgent);color:#fff;font-size:9.5px;font-weight:700;line-height:1;padding:2.5px 4.5px;border-radius:8px;min-width:14px;text-align:center;}
+  .navitem span{font-size:10.5px;font-weight:600;}
+
+  /* ---- settings modal ---- */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.35);z-index:50;display:none;}
+  .modal-overlay.open{display:block;}
+  .modal-sheet{
+    position:fixed;left:0;right:0;bottom:0;background:var(--card);border-radius:16px 16px 0 0;
+    padding:20px 20px calc(24px + env(safe-area-inset-bottom));z-index:51;
+    max-height:80vh;overflow-y:auto;transform:translateY(100%);transition:transform .25s ease;
+  }
+  .modal-overlay.open .modal-sheet{transform:translateY(0);}
+  .modal-handle{width:36px;height:4px;background:var(--rule);border-radius:99px;margin:0 auto 16px;}
+  .modal-title{font-family:Georgia,serif;font-size:18px;font-weight:700;margin-bottom:16px;}
+  .field-block{margin-bottom:18px;}
+  .field-block label{font-size:12px;color:var(--ink-faint);display:block;margin-bottom:6px;}
+  .field-block input[type=text]{
+    width:100%;font-size:16px;padding:11px 12px;border:1px solid var(--rule);border-radius:8px;
+    background:var(--paper);color:var(--ink);font-family:inherit;
+  }
+  .weather-row{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:13px;color:var(--ink-muted);}
+  .weather-row svg{width:22px;height:22px;}
+  .theme-toggle{display:flex;gap:8px;}
+  .theme-opt{
+    flex:1;padding:12px;border:1px solid var(--rule);border-radius:8px;text-align:center;font-size:13px;
+    cursor:pointer;min-height:44px;display:flex;align-items:center;justify-content:center;gap:6px;
+  }
+  .theme-opt.active{border-color:var(--mark-c);background:var(--info-bg);font-weight:700;}
+  .modal-close{
+    width:100%;padding:12px;border-radius:8px;background:var(--mark-c);color:#fff;border:none;
+    font-size:14px;font-weight:600;cursor:pointer;min-height:44px;margin-top:6px;
+  }
+
+  /* ---- report ---- */
+  #reportWeekBtn.active, #reportMonthBtn.active{background:var(--mark-c);color:#fff;border-color:var(--mark-c);}
+  .report-section{margin-bottom:20px;}
+  .report-section-title{font-size:13px;font-weight:700;margin-bottom:8px;color:var(--ink);}
+  .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px;}
+  .stat-card{background:var(--card);border:1px solid var(--rule);border-radius:10px;padding:10px 12px;}
+  .stat-card .stat-label{font-size:11px;color:var(--ink-faint);margin-bottom:3px;}
+  .stat-card .stat-value{font-size:20px;font-weight:700;color:var(--ink);}
+  .stat-card .stat-delta{font-size:11.5px;margin-top:3px;}
+  .stat-delta.up{color:var(--urgent);}
+  .stat-delta.down{color:#2e8b57;}
+  .stat-delta.flat{color:var(--ink-faint);}
+  .report-chart-wrap{background:var(--card);border:1px solid var(--rule);border-radius:10px;padding:10px 12px;margin-bottom:10px;}
+  .report-chart-wrap canvas{width:100%;display:block;}
+  .report-empty-note{font-size:12px;color:var(--ink-faint);}
+  @media print{
+    /* Three different approaches were tried before this one:
+       (1) visibility:hidden on everything else still reserves full layout
+       space for hidden siblings, pushing the report down by several blank
+       pages (measured: 4 blank pages before content appeared).
+       (2) position:fixed on the report avoids that push, but Chrome repeats
+       fixed-position content identically on every printed page instead of
+       flowing it — the report never got past its first viewport-height of
+       content, just duplicated across all pages (measured directly: 5 pages,
+       all identical, most of the report never appeared).
+       (3) This: use display:none (not visibility) on every OTHER top-level
+       section of the app, which removes them from layout entirely — zero
+       height, not just invisible — so the report modal, left in normal
+       position:static flow, starts at the top of page 1 and paginates
+       naturally across as many pages as its real content needs. */
+    body > *:not(#reportOverlay){display:none !important;}
+    #reportOverlay{position:static !important;background:none !important;display:block !important;}
+    #reportSheet{position:static !important;max-height:none !important;overflow:visible !important;transform:none !important;padding:12px !important;}
+    .no-print{display:none !important;}
+  }
+
+  /* ---- panels ---- */
+  .panel{display:none;}
+  .panel.active{display:block;}
+
+  .section-eyebrow{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);font-weight:600;margin-bottom:8px;}
+  .section-title{font-family:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;font-size:19px;font-weight:700;margin:0 0 12px;}
+
+  /* ---- greeting / briefing ---- */
+  .greeting-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;}
+  .greeting{font-family:Georgia,serif;font-size:22px;font-weight:700;margin:4px 0 2px;}
+  .greeting-sub{font-size:13px;color:var(--ink-muted);margin-bottom:16px;}
+  .refresh-line{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--ink-faint);margin-bottom:14px;}
+  .refresh-line button{background:none;border:none;color:var(--info);font-size:11.5px;cursor:pointer;font-weight:600;min-height:32px;}
+
+  .decision-card{background:var(--card);border:1px solid var(--rule);border-radius:10px;padding:14px 16px;margin-bottom:10px;}
+  .decision-card .dc-text{font-size:13.5px;line-height:1.55;margin-bottom:10px;}
+  .decision-card .dc-btns{display:flex;gap:8px;flex-wrap:wrap;}
+  .dc-btn{
+    font-size:12.5px;padding:9px 13px;border-radius:99px;border:1px solid var(--rule);background:var(--paper);
+    color:var(--ink);cursor:pointer;min-height:36px;
+  }
+  .dc-btn.primary{background:var(--mark-c);color:#fff;border-color:var(--mark-c);}
+  .dc-resolved{font-size:12px;color:var(--calm);display:flex;align-items:center;gap:5px;}
+
+  .scanbar{display:flex;flex-wrap:wrap;gap:0;border-bottom:1px solid var(--rule);margin:0 0 22px;padding-bottom:16px;}
+  .scanstat{flex:1 1 45%;padding:6px 10px 6px 0;}
+  .scanstat .num{font-family:Georgia,serif;font-size:22px;font-weight:700;line-height:1;}
+  .scanstat .num.overdue{color:var(--overdue);}
+  .scanstat .lbl{font-size:11px;color:var(--ink-muted);margin-top:3px;}
+
+  .briefing{margin-bottom:30px;}
+  .category{margin-bottom:26px;}
+
+  /* ---- item cards (shared) ---- */
+  .item{background:var(--card);border:1px solid var(--rule);border-left:4px solid var(--info);border-radius:10px;padding:13px 14px;margin-bottom:9px;display:flex;gap:12px;align-items:flex-start;}
+  .item.urgent{border-left-color:var(--urgent);border-left-width:6px;background:linear-gradient(to right, var(--urgent-bg) 0%, var(--card) 6%);}
+  .item.soon{border-left-color:var(--soon);}
+  .item.calm{border-left-color:var(--calm);}
+  .item.overdue{border-left-color:var(--overdue);border-left-width:6px;background:linear-gradient(to right, var(--overdue-bg) 0%, var(--card) 6%);}
+  .item.vip{box-shadow:inset 0 0 0 1px var(--vip);}
+  .item.done{opacity:.45;}
+  .meeting-group{background:var(--card);border:1px solid var(--rule);border-left:4px solid var(--mark-l);border-radius:10px;padding:13px 14px 4px;margin-bottom:9px;}
+  .meeting-group-header{display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap;margin-bottom:4px;}
+  .meeting-group-title{font-size:14.5px;font-weight:700;}
+  .meeting-group-summary{font-size:12.5px;color:var(--ink-muted);margin-bottom:8px;}
+  .meeting-group-del{font-size:11px;color:var(--ink-faint);text-decoration:underline;cursor:pointer;white-space:nowrap;}
+  .meeting-group .item{margin-bottom:8px;padding:10px 12px;}
+  .list-section-header{font-size:11.5px;font-weight:700;letter-spacing:.04em;color:var(--ink-faint);text-transform:uppercase;margin:14px 0 6px;}
+  .list-section-header:first-child{margin-top:0;}
+  .doc-filter-row{display:flex;gap:8px;margin-bottom:10px;}
+  .doc-filter-row input{flex:1;font-size:13.5px;padding:8px 10px;border:1px solid var(--rule);border-radius:8px;background:var(--paper);color:var(--ink);}
+  .doc-filter-row select{font-size:13px;padding:8px 8px;border:1px solid var(--rule);border-radius:8px;background:var(--paper);color:var(--ink);}
+  .item-check{margin-top:2px;flex-shrink:0;width:22px;height:22px;display:flex;align-items:center;justify-content:center;}
+  .item-check input{width:20px;height:20px;cursor:pointer;accent-color:var(--mark-c);}
+  .item-body{flex:1;min-width:0;}
+  .item-top{display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap;}
+  .item-subject{font-size:14px;font-weight:600;line-height:1.35;}
+  .item.done .item-subject{text-decoration:line-through;}
+  .item-tags{display:flex;gap:5px;flex-wrap:wrap;}
+  .item-tag{font-size:10px;font-weight:700;letter-spacing:.02em;padding:2px 7px;border-radius:99px;white-space:nowrap;}
+  .tag-urgent{background:var(--urgent-bg);color:var(--urgent);}
+  .tag-soon{background:var(--soon-bg);color:var(--soon);}
+  .tag-calm{background:var(--calm-bg);color:var(--calm);}
+  .tag-info{background:var(--info-bg);color:var(--info);}
+  .tag-overdue{background:var(--overdue-bg);color:var(--overdue);}
+  .tag-vip{background:var(--vip-bg);color:var(--vip);}
+  .item-meta{font-size:11.5px;color:var(--ink-muted);margin-top:2px;}
+  .item-src{display:inline-block;font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:99px;margin-right:5px;background:var(--info-bg);color:var(--info);}
+  .item-src.cal{background:var(--calm-bg);color:var(--calm);}
+  .item-src.doc{background:var(--thsr-bg);color:var(--thsr);}
+  .item-src.action{background:#EAE6F3;color:#6B5A98;}
+  [data-theme="dark"] .item-src.action{background:#332C42;color:#B7A6D9;}
+  .item-reason{font-size:12px;color:var(--ink-muted);margin-top:5px;line-height:1.5;}
+  .item-note{margin-top:9px;width:100%;font-size:16px;padding:8px 10px;border:1px solid var(--rule);border-radius:8px;font-family:inherit;background:var(--paper);color:var(--ink);resize:vertical;min-height:38px;}
+  .item-note-label{font-size:10px;color:var(--ink-faint);margin-top:8px;}
+  .empty{background:var(--card);border:1px dashed var(--rule);border-radius:10px;padding:22px 16px;text-align:center;color:var(--ink-faint);font-size:13px;}
+
+  .thsr-chip{margin-top:9px;background:var(--thsr-bg);border-radius:8px;padding:8px 10px;font-size:11.5px;color:var(--thsr);display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
+  .thsr-chip a{color:var(--thsr);font-weight:700;text-decoration:underline;}
+  .thsr-chip svg{width:16px;height:16px;flex-shrink:0;}
+  .mail-reminder-link, .edit-toggle-chip{
+    margin-top:9px;display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--info);
+    text-decoration:none;background:var(--info-bg);border-radius:8px;padding:7px 10px;min-height:32px;cursor:pointer;
+  }
+  .mail-reminder-link svg, .edit-toggle-chip svg{width:15px;height:15px;flex-shrink:0;}
+
+  .transit-box{margin-top:9px;background:var(--info-bg);border-radius:8px;padding:10px 11px;}
+  .transit-box .t-label{font-size:10px;color:var(--ink-faint);letter-spacing:.03em;margin-bottom:6px;}
+  .transit-box .t-row{display:flex;align-items:center;gap:8px;font-size:12.5px;margin-bottom:7px;color:var(--ink);}
+  .transit-box .t-row:last-child{margin-bottom:0;}
+  .transit-box label{display:flex;align-items:center;gap:7px;flex:1;cursor:pointer;min-height:26px;}
+  .transit-box input[type=checkbox]{width:18px;height:18px;accent-color:var(--mark-c);flex-shrink:0;}
+  .transit-box input[type=date]{font-size:13px;padding:5px 7px;border:1px solid var(--rule);border-radius:6px;background:var(--card);color:var(--ink);}
+  .transit-box .t-del{font-size:10.5px;color:var(--ink-faint);text-decoration:underline;cursor:pointer;white-space:nowrap;min-height:24px;}
+  .completion-date-row{display:flex;align-items:center;gap:9px;margin-top:9px;font-size:12px;color:var(--ink-muted);}
+  .completion-date-row input[type=date]{font-size:13px;padding:5px 7px;border:1px solid var(--rule);border-radius:6px;background:var(--paper);color:var(--ink);}
+  .debug-banner{background:var(--overdue-bg);color:var(--overdue);border-radius:10px;padding:12px 14px;margin:12px 0;font-size:12.5px;line-height:1.6;}
+  .debug-banner .db-title{font-weight:700;margin-bottom:6px;}
+  .debug-banner pre{white-space:pre-wrap;word-break:break-word;background:rgba(0,0,0,0.06);padding:8px;border-radius:6px;font-size:11px;margin:6px 0;}
+  .debug-banner button{margin-top:6px;background:var(--overdue);color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:11.5px;cursor:pointer;}
+  .global-toast{
+    position:fixed;left:16px;right:16px;bottom:88px;z-index:60;
+    background:var(--mark-c);color:#fff;border-radius:12px;padding:14px 16px;
+    font-size:13.5px;line-height:1.6;box-shadow:0 6px 20px rgba(0,0,0,0.25);
+    display:flex;align-items:flex-start;gap:10px;
+    opacity:0;transform:translateY(12px);pointer-events:none;transition:opacity .25s ease,transform .25s ease;
+    max-width:520px;margin:0 auto;
+  }
+  .global-toast.show{opacity:1;transform:translateY(0);pointer-events:auto;}
+  .global-toast svg{width:20px;height:20px;flex-shrink:0;margin-top:1px;}
+  .global-toast .gt-title{font-weight:700;margin-bottom:2px;}
+
+  .prep-box{margin-top:9px;background:var(--paper);border:1px solid var(--rule);border-radius:8px;padding:10px 11px;}
+  .prep-box .lbl{font-size:10.5px;color:var(--ink-faint);display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px;}
+  .prep-box textarea{width:100%;min-height:56px;font-size:16px;font-family:inherit;padding:8px 9px;border:1px solid var(--rule);border-radius:6px;background:var(--card);color:var(--ink);}
+  .mini-btn{font-size:11px;background:var(--mark-c);color:#fff;border:none;border-radius:99px;padding:6px 11px;cursor:pointer;min-height:30px;white-space:nowrap;}
+  .mini-btn:disabled{opacity:.5;}
+  .mini-status{font-size:10.5px;color:var(--ink-faint);margin-top:4px;}
+
+  /* ---- weekly (vertical) ---- */
+  .grid-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+  .grid-head .icon-btn{width:34px;height:34px;}
+  .grid-head .icon-btn svg{width:16px;height:16px;}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:8px;}
+  .cal-grid .cg-dow{font-size:10.5px;color:var(--ink-faint);text-align:center;padding-bottom:4px;font-weight:600;}
+  .cal-cell{
+    aspect-ratio:1/1;border-radius:8px;background:var(--card);border:1px solid var(--rule);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;
+    font-size:12.5px;color:var(--ink);cursor:default;
+  }
+  .cal-cell.blank{background:transparent;border:none;}
+  .cal-cell.has-events{cursor:pointer;}
+  .cal-cell.today{border-color:var(--mark-c);border-width:2px;font-weight:700;}
+  .cal-cell .cg-dot{width:5px;height:5px;border-radius:50%;background:var(--mark-l);margin-top:3px;}
+  .cal-cell .cg-dot.urgent-dot{background:var(--urgent);}
+  .cal-cell .cg-count{position:absolute;top:2px;right:4px;font-size:8.5px;color:var(--ink-faint);}
+  .day-block{margin-bottom:18px;}
+  .day-block.flash{animation:flashHighlight 1.2s ease;}
+  @keyframes flashHighlight{0%{background:var(--info-bg);border-radius:10px;}100%{background:transparent;}}
+  .day-head{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+  .day-head .d-label{font-family:Georgia,serif;font-weight:700;font-size:15px;}
+  .day-head.today .d-label{color:var(--mark-c);}
+  .day-head .d-dot{width:7px;height:7px;border-radius:50%;background:var(--mark-l);}
+  .day-empty-line{font-size:12px;color:var(--ink-faint);padding-left:2px;}
+
+  /* ---- docs tab ---- */
+  .doc-upload{background:var(--card);border:1px solid var(--rule);border-radius:12px;padding:16px;margin-bottom:22px;}
+  .type-select{display:flex;gap:10px;margin-bottom:10px;font-size:13px;flex-wrap:wrap;}
+  .type-select label{display:flex;align-items:center;gap:5px;cursor:pointer;min-height:32px;}
+  .doc-upload textarea{width:100%;min-height:110px;font-size:16px;font-family:inherit;padding:10px;border:1px solid var(--rule);border-radius:8px;resize:vertical;background:var(--paper);color:var(--ink);}
+  .doc-upload .row{display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap;}
+  .doc-upload input[type=file]{font-size:12px;}
+  .btn{background:var(--mark-c);color:#fff;border:none;border-radius:8px;padding:11px 18px;font-size:13.5px;font-weight:600;cursor:pointer;min-height:44px;}
+  .btn:disabled{opacity:.5;cursor:default;}
+  .btn.secondary{background:transparent;color:var(--ink);border:1px solid var(--rule);}
+  .btn.block{width:100%;}
+  .doc-hint{font-size:11.5px;color:var(--ink-faint);margin-top:8px;line-height:1.5;}
+  .draft-box{margin-top:10px;}
+  .draft-box .lbl{font-size:10.5px;color:var(--ink-faint);margin-bottom:4px;display:flex;justify-content:space-between;}
+  .draft-box textarea{width:100%;min-height:100px;font-size:13.5px;font-family:inherit;padding:9px;border:1px solid var(--rule);border-radius:8px;background:var(--paper);color:var(--ink);}
+  .sent-row{display:flex;align-items:center;gap:10px;margin-top:8px;font-size:12.5px;}
+  .sent-row label{display:flex;align-items:center;gap:5px;}
+  .sent-row input[type=date]{font-size:12px;padding:3px 5px;border:1px solid var(--rule);border-radius:6px;background:var(--paper);color:var(--ink);}
+  .status-line{font-size:12px;color:var(--ink-muted);margin-top:8px;min-height:16px;}
+  .status-line.err{color:var(--urgent);}
+
+  /* ---- lab tab ---- */
+  .calc-box .calc-field{display:flex;flex-direction:column;gap:5px;margin-bottom:10px;}
+  .calc-field label{font-size:11px;color:var(--ink-faint);}
+  .calc-field-row{display:flex;gap:8px;}
+  .calc-field-row .calc-field{flex:1;}
+  .calc-field input,.calc-field select{font-size:16px;padding:9px 10px;border:1px solid var(--rule);border-radius:8px;font-family:inherit;background:var(--paper);color:var(--ink);width:100%;}
+  .calc-result{margin-top:12px;background:var(--paper);border:1px solid var(--rule);border-radius:8px;padding:12px;font-size:13px;line-height:1.7;min-height:20px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;}
+  .calc-result:empty{display:none;}
+  .calc-result table{width:100%;border-collapse:collapse;font-size:12px;}
+  .calc-result th,.calc-result td{border-bottom:1px solid var(--rule);padding:5px 6px;text-align:left;}
+  .calc-result th{color:var(--ink-faint);font-weight:600;font-family:-apple-system,sans-serif;}
+
+  .group-card{background:var(--card);border:1px solid var(--rule);border-radius:12px;padding:16px;margin-bottom:14px;}
+  .group-field{margin-bottom:12px;display:flex;flex-direction:column;gap:5px;}
+  .group-field label{font-size:11px;color:var(--ink-faint);}
+  .group-field input,.group-field textarea{font-size:16px;padding:9px 10px;border:1px solid var(--rule);border-radius:8px;font-family:inherit;background:var(--paper);color:var(--ink);}
+  .group-field textarea{min-height:44px;resize:vertical;}
+  .group-treatments .glbl{font-size:11px;color:var(--ink-faint);margin-bottom:6px;}
+  .add-treatment-row{display:flex;gap:8px;margin-top:8px;}
+  .add-treatment-row input{flex:1;font-size:16px;padding:9px 10px;border:1px solid var(--rule);border-radius:8px;background:var(--paper);color:var(--ink);}
+  .group-foot{display:flex;justify-content:flex-end;margin-top:10px;}
+  .group-foot span{font-size:11px;color:var(--ink-faint);cursor:pointer;text-decoration:underline;min-height:32px;display:inline-flex;align-items:center;}
+
+  .note-card{background:var(--card);border:1px solid var(--rule);border-left:4px solid var(--mark-l);border-radius:10px;padding:12px 14px;margin-bottom:9px;}
+  .note-card .note-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px;}
+  .note-card .note-title{font-size:13.5px;font-weight:600;}
+  .note-card .note-del{font-size:11px;color:var(--ink-faint);cursor:pointer;text-decoration:underline;white-space:nowrap;}
+  .note-card .note-body{font-size:12px;color:var(--ink-muted);margin-top:6px;white-space:pre-wrap;line-height:1.6;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;}
+  .edit-box{margin-top:10px;padding-top:10px;border-top:1px solid var(--rule);}
+  .edit-box input{width:100%;font-size:16px;padding:9px 10px;border:1px solid var(--rule);border-radius:8px;background:var(--paper);color:var(--ink);font-family:inherit;}
+  .edit-box .row{display:flex;gap:8px;}
+  .edit-box .row input{flex:1;}
+  .suggestion-chip{display:flex;align-items:center;gap:8px;background:var(--calm-bg);color:var(--calm);border-radius:10px;padding:8px 10px;font-size:12.5px;margin-bottom:8px;flex-wrap:wrap;}
+  .suggestion-chip select{font-size:12px;border-radius:6px;border:1px solid var(--rule);padding:4px 6px;}
+  .suggestion-chip button{background:var(--calm);color:#fff;border:none;border-radius:99px;padding:5px 11px;font-size:11px;cursor:pointer;min-height:30px;}
+
+  details{margin-top:6px;}
+  summary{cursor:pointer;font-size:12px;color:var(--ink-faint);list-style:none;display:inline-flex;align-items:center;gap:5px;min-height:32px;}
+  summary::-webkit-details-marker{display:none;}
+  summary:before{content:"▸";font-size:10px;}
+  details[open] summary:before{content:"▾";}
+  .noise-list{margin-top:10px;font-size:12px;color:var(--ink-muted);line-height:2;}
+  .noise-list span{display:inline-block;background:var(--info-bg);color:var(--info);padding:2px 9px;border-radius:99px;margin:0 6px 6px 0;}
+
+  footer{margin:36px 0 8px;padding-top:14px;border-top:1px solid var(--rule);font-size:11px;color:var(--ink-faint);line-height:1.7;}
+</style>
+</head>
+<body data-theme="light">
+<div class="topbar">
+  <div class="brand" id="brandMark"></div>
+  <div class="top-actions">
+    <div class="icon-btn" id="settingsBtn" title="設定">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </div>
+  </div>
+</div>
+<div class="datebar" id="todayDate"></div>
+
+<div class="wrap" id="mainWrap">
+  <div id="debugErrorBanner" style="display:none;"></div>
+
+
+  <!-- ===================== TODAY PANEL ===================== -->
+  <div class="panel active" id="panel-today">
+    <div class="greeting-row">
+      <div>
+        <div class="greeting" id="greetingText"></div>
+        <div class="greeting-sub" id="greetingSub"></div>
+      </div>
+    </div>
+    <details id="calImportDetails" style="margin:-4px 0 16px;">
+      <summary>＋ 新增或匯入行事曆</summary>
+      <div class="doc-upload" style="margin-top:10px;">
+        <div class="field-block" style="margin-bottom:12px;">
+          <label>手動新增一筆行程</label>
+          <input type="text" id="newEventTitle" placeholder="標題，例如：與王經理開會" style="width:100%;font-size:16px;padding:10px;border:1px solid var(--rule);border-radius:8px;margin-bottom:8px;background:var(--paper);color:var(--ink);">
+          <div class="row" style="margin-top:0;">
+            <input type="date" id="newEventDate" style="flex:1;font-size:16px;padding:10px;border:1px solid var(--rule);border-radius:8px;background:var(--paper);color:var(--ink);">
+            <input type="text" id="newEventTime" placeholder="時間，例如 14:00" style="flex:1;font-size:16px;padding:10px;border:1px solid var(--rule);border-radius:8px;background:var(--paper);color:var(--ink);">
+          </div>
+          <input type="text" id="newEventLocation" placeholder="地點（選填）" style="width:100%;font-size:16px;padding:10px;border:1px solid var(--rule);border-radius:8px;margin-top:8px;background:var(--paper);color:var(--ink);">
+          <label style="display:flex;align-items:center;gap:7px;margin-top:10px;font-size:13px;cursor:pointer;">
+            <input type="checkbox" id="newEventTeach" style="width:18px;height:18px;accent-color:var(--mark-c);"> 這是邀課邀請
+          </label>
+          <div class="row"><button class="btn block" id="addEventBtn">新增這筆行程</button></div>
+        </div>
+        <div class="field-block" style="margin-bottom:12px;">
+          <label>或匯入 .ics 行事曆檔案（Google/Outlook 皆可匯出）</label>
+          <input type="file" id="icsFile" accept=".ics">
+          <div class="row"><button class="btn secondary block" id="importIcsBtn">匯入</button></div>
+          <div class="doc-hint">簡易解析器，讀取每筆事件的標題、日期、時間、地點；不支援重複性事件的完整規則展開。</div>
+        </div>
+        <div class="field-block" style="margin-bottom:6px;">
+          <label>或用行事曆截圖匯入（透過 Claude App 辨識）</label>
+          <div class="row"><button class="btn secondary block" id="copyScreenshotPromptBtn">複製提示詞（去 Claude 分析截圖）</button></div>
+          <div class="doc-hint">先按上面按鈕複製提示詞，到 Claude App（或其他生成式AI）貼上提示詞、附上你的行事曆截圖，取得回覆後貼回下面欄位匯入。截圖不清楚或年份不明時可能判讀有誤，建議匯入後檢查一下、有需要用「編輯」修正。</div>
+          <textarea id="screenshotAiReplyInput" placeholder="把 Claude（或其他生成式AI）的回覆貼在這裡…" style="margin-top:8px;"></textarea>
+          <div class="row"><button class="btn block" id="parseScreenshotReplyBtn">貼上並匯入</button></div>
+        </div>
+        <div class="status-line" id="calImportStatus"></div>
+      </div>
+      <div class="field-block" style="margin-top:14px;margin-bottom:4px;"><label>未來 30 天的行程（點「編輯」可修改）</label></div>
+      <div id="customEventList" style="margin-top:4px;"></div>
+    </details>
+    <div class="refresh-line">
+      <span id="briefingUpdated"></span>
+      <button id="refreshBriefingBtn">重新整理重點</button>
+    </div>
+    <div id="decisionCards"></div>
+
+    <div class="scanbar" id="scanbar"></div>
+    <div class="briefing">
+      <div class="section-eyebrow">今日追蹤清單</div>
+      <div class="section-title">彙整代辦事項</div>
+      <div id="briefingList"></div>
+    </div>
+    <div class="category">
+      <div class="section-title">行事曆提醒</div>
+      <div id="calendarList"></div>
+    </div>
+    <div class="category">
+      <div class="section-title">邀課信件</div>
+      <div id="teachingList"></div>
+    </div>
+  </div>
+
+  <!-- ===================== WEEK PANEL ===================== -->
+  <div class="panel" id="panel-week">
+    <div class="scanbar" id="weekScanbar"></div>
+    <div class="section-eyebrow">本月總覽</div>
+    <div class="row" style="margin-bottom:14px;">
+      <button class="btn secondary block" id="openReportBtn">週報／月報（含圖表，可下載 PDF）</button>
+    </div>
+    <div class="grid-head">
+      <button class="icon-btn" id="gridPrevBtn" title="上個月"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <div class="section-title" id="gridMonthLabel" style="margin:0;"></div>
+      <button class="icon-btn" id="gridNextBtn" title="下個月"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
+    </div>
+    <div class="cal-grid" id="calGrid"></div>
+    <div class="section-eyebrow" style="margin-top:26px;">明細</div>
+    <div class="section-title">依日期排列（未來 30 天，只列有事的日子）</div>
+    <div id="weekDayList"></div>
+  </div>
+
+  <!-- ===================== DOCS PANEL ===================== -->
+  <div class="panel" id="panel-docs">
+    <div class="section-eyebrow">上傳新內容</div>
+    <div class="section-title">公文／會議記錄分析</div>
+    <div class="doc-upload">
+      <div class="type-select">
+        <label><input type="radio" name="docType" value="doc" checked> 公文</label>
+        <label><input type="radio" name="docType" value="meeting"> 會議記錄</label>
+      </div>
+      <textarea id="docInput" placeholder="貼上公文內容，或會議記錄逐字稿／摘要…"></textarea>
+      <div class="row">
+        <input type="file" id="docFile" accept=".txt,.md">
+      </div>
+      <div class="row">
+        <button class="btn block" id="copyDocPromptBtn">複製提示詞（去 Claude 分析）</button>
+      </div>
+      <div class="row">
+        <button class="btn secondary block" id="mailReminderBtn">寄提醒信給自己</button>
+      </div>
+      <div class="row">
+        <button class="btn secondary block" id="clearBtn">清空</button>
+      </div>
+      <div class="doc-hint" id="docHint">公文：先按「複製提示詞」，貼到 Claude App（或其他生成式AI）取得回覆，再把回覆貼回下面欄位加入追蹤。</div>
+      <div class="doc-hint">「寄提醒信給自己」主要是把內容複製到剪貼簿（一定會成功），同時嘗試開啟寄信 App（不一定會跳出來，視裝置而定）——複製成功後直接到你的信箱貼上即可，不用等寄信 App 跳出來。</div>
+      <div class="status-line" id="docStatus"></div>
+      <textarea id="aiReplyInput" placeholder="把 Claude（或其他生成式AI）的回覆貼在這裡…" style="margin-top:10px;"></textarea>
+      <div class="row">
+        <button class="btn block" id="parseReplyBtn">貼上並加入追蹤</button>
+      </div>
+      <div class="status-line" id="aiReplyStatus"></div>
+    </div>
+    <div class="section-eyebrow">追蹤中</div>
+    <div class="section-title">清單</div>
+    <div class="doc-filter-row">
+      <input type="text" id="docSearchInput" placeholder="搜尋主旨、摘要、負責人…">
+      <select id="docFilterUrgency">
+        <option value="">全部急迫度</option>
+        <option value="overdue">已逾期</option>
+        <option value="urgent">緊急（今明兩天）</option>
+        <option value="soon">3天內</option>
+        <option value="calm">3天以上</option>
+        <option value="info">待確認</option>
+      </select>
+    </div>
+    <div id="docList"></div>
+  </div>
+
+  <!-- ===================== LAB PANEL ===================== -->
+  <div class="panel" id="panel-lab">
+    <div class="scanbar" id="labScanbar"></div>
+
+    <div class="section-eyebrow">本月總覽</div>
+    <div class="section-title">這個月做了什麼、還剩什麼</div>
+    <div id="labMonthSummary"></div>
+
+    <div class="section-eyebrow" style="margin-top:26px;">今天要做什麼</div>
+    <div class="section-title">實驗設計與待做條件</div>
+    <div id="labGroupList"></div>
+    <div class="row"><button class="btn secondary block" id="addGroupBtn">＋ 新增一組實驗設計</button></div>
+
+    <div class="section-eyebrow" style="margin-top:26px;">今天的結果 → 下一步</div>
+    <div class="section-title">AI 建議延伸實驗</div>
+    <div class="doc-upload">
+      <textarea id="labResultInput" placeholder="貼上今天的實驗結果或觀察…"></textarea>
+      <div class="row"><button class="btn block" id="labSuggestBtn">複製提示詞（去 Claude 分析）</button></div>
+      <div class="status-line" id="labSuggestStatus"></div>
+      <textarea id="labAiReplyInput" placeholder="把 Claude（或其他生成式AI）的回覆貼在這裡…" style="margin-top:10px;"></textarea>
+      <div class="row"><button class="btn block" id="labParseReplyBtn">貼上並顯示建議</button></div>
+      <div class="status-line" id="labParseStatus"></div>
+      <div id="labSuggestions"></div>
+    </div>
+
+    <div class="section-eyebrow" style="margin-top:26px;">試劑計算</div>
+    <div class="section-title">單次稀釋（C₁V₁ = C₂V₂）</div>
+    <div class="doc-upload calc-box">
+      <div class="calc-field"><label>試劑名稱</label><input type="text" id="c1Name" placeholder="例如 Nafomastat"></div>
+      <div class="calc-field-row">
+        <div class="calc-field"><label>C₁（stock）</label><input type="number" id="c1Val" placeholder="20"></div>
+        <div class="calc-field"><label>單位</label><select id="c1Unit"><option value="M">M</option><option value="mM" selected>mM</option><option value="uM">µM</option><option value="nM">nM</option><option value="pM">pM</option></select></div>
+      </div>
+      <div class="calc-field"><label>V₁（取用體積，留白＝待計算）</label><input type="number" id="v1Val" placeholder="留白＝待計算"></div>
+      <div class="calc-field-row">
+        <div class="calc-field"><label>C₂（目標濃度）</label><input type="number" id="c2Val" placeholder="2"></div>
+        <div class="calc-field"><label>單位</label><select id="c2Unit"><option value="M">M</option><option value="mM">mM</option><option value="uM" selected>µM</option><option value="nM">nM</option><option value="pM">pM</option></select></div>
+      </div>
+      <div class="calc-field-row">
+        <div class="calc-field"><label>V₂（目標總體積）</label><input type="number" id="v2Val" placeholder="50"></div>
+        <div class="calc-field"><label>體積單位</label><input type="text" id="volUnit" value="uL"></div>
+      </div>
+      <div class="calc-field"><label>稀釋液名稱</label><input type="text" id="diluentName" value="PBS"></div>
+      <div class="calc-field"><label>要計算哪一項？</label>
+        <select id="solveFor">
+          <option value="v1">V₁（已知 C₁ C₂ V₂）</option>
+          <option value="c2">C₂（已知 C₁ V₁ V₂）</option>
+          <option value="v2">V₂（已知 C₁ V₁ C₂）</option>
+          <option value="c1">C₁（已知 V₁ C₂ V₂）</option>
+        </select>
+      </div>
+      <div class="row"><button class="btn block" id="calcSingleBtn">計算</button></div>
+      <div class="row"><button class="btn secondary block" id="addSingleToNotesBtn" disabled>加入方法紀錄</button></div>
+      <div class="calc-result" id="singleResult"></div>
+    </div>
+
+    <div class="section-title">連續稀釋（Serial Dilution）</div>
+    <div class="doc-upload calc-box">
+      <div class="calc-field"><label>試劑名稱</label><input type="text" id="sdName" placeholder="例如 Nafomastat"></div>
+      <div class="calc-field-row">
+        <div class="calc-field"><label>Stock 濃度</label><input type="number" id="sdC0" placeholder="20"></div>
+        <div class="calc-field"><label>單位</label><select id="sdCUnit"><option value="M">M</option><option value="mM" selected>mM</option><option value="uM">µM</option><option value="nM">nM</option><option value="pM">pM</option></select></div>
+      </div>
+      <div class="calc-field"><label>結果顯示單位</label><select id="sdOutUnit"><option value="M">M</option><option value="mM">mM</option><option value="uM" selected>µM</option><option value="nM">nM</option><option value="pM">pM</option></select></div>
+      <div class="calc-field-row">
+        <div class="calc-field"><label>每次稀釋倍數</label><input type="number" id="sdFactor" placeholder="例如 2 或 10"></div>
+        <div class="calc-field"><label>級數</label><input type="number" id="sdSteps" placeholder="5"></div>
+      </div>
+      <div class="calc-field-row">
+        <div class="calc-field"><label>每管體積</label><input type="number" id="sdVol" placeholder="100"></div>
+        <div class="calc-field"><label>體積單位</label><input type="text" id="sdVolUnit" value="uL"></div>
+      </div>
+      <div class="calc-field"><label>稀釋液名稱</label><input type="text" id="sdDiluent" value="PBS"></div>
+      <div class="row"><button class="btn block" id="calcSerialBtn">計算</button></div>
+      <div class="row"><button class="btn secondary block" id="addSerialToNotesBtn" disabled>加入方法紀錄</button></div>
+      <div class="calc-result" id="serialResult"></div>
+    </div>
+
+    <div class="section-eyebrow">方法紀錄</div>
+    <div class="section-title">試劑配置與步驟</div>
+    <div class="doc-upload">
+      <input type="text" id="labNoteTitle" placeholder="標題" style="width:100%;font-size:16px;padding:9px 10px;border:1px solid var(--rule);border-radius:8px;margin-bottom:8px;background:var(--paper);color:var(--ink);">
+      <textarea id="labNoteBody" placeholder="內容…" style="min-height:70px;"></textarea>
+      <div class="row"><button class="btn block" id="labNoteAddBtn">新增紀錄</button></div>
+      <div id="labProtocolPrompt"></div>
+    </div>
+    <div id="labNoteList"></div>
+  </div>
+
+  <footer id="footerText"></footer>
+</div>
+
+<div id="globalToast" class="global-toast"></div>
+<div class="bottomnav">
+  <div class="navitem active" data-panel="today">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4M16 2v4M3 10h18"/><rect x="3" y="4" width="18" height="18" rx="2"/></svg>
+    <span>今日</span>
+  </div>
+  <div class="navitem" data-panel="week">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18M9 16h.01M13 16h.01M17 16h.01M9 13h.01M13 13h.01M17 13h.01"/></svg>
+    <span>本月</span>
+  </div>
+  <div class="navitem" data-panel="docs">
+    <div class="nav-icon-wrap">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h6"/></svg>
+      <span class="nav-badge" id="docsBadge" style="display:none;"></span>
+    </div>
+    <span>公文</span>
+  </div>
+  <div class="navitem" data-panel="lab">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v6.5L4.5 18a1.5 1.5 0 0 0 1.3 2.2h12.4a1.5 1.5 0 0 0 1.3-2.2L15 8.5V2M9 2h6M8 15h8"/></svg>
+    <span>實驗</span>
+  </div>
+</div>
+
+<div class="modal-overlay" id="settingsOverlay">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">設定</div>
+    <div class="field-block">
+      <label>常駐城市（用於外縣市邀課的高鐵提醒）</label>
+      <input type="text" id="homeCityInput" placeholder="例如：台北">
+    </div>
+    <div class="field-block">
+      <label>VIP 聯絡人（逗號分隔，符合的行程/信件會優先排序）</label>
+      <input type="text" id="vipInput" placeholder="例如：王經理, manager@example-corp.com">
+    </div>
+    <div class="field-block">
+      <label>公文回覆固定用語／簽名（會自動附加到「複製提示詞」產生的草稿要求中）</label>
+      <textarea id="replySignatureInput" placeholder="例如：敬祝　鈞安、單位全銜、職稱、姓名…" style="min-height:60px;"></textarea>
+    </div>
+    <div class="field-block">
+      <label>顯示模式</label>
+      <div class="theme-toggle">
+        <div class="theme-opt active" data-theme-choice="light">☀ 淺色</div>
+        <div class="theme-opt" data-theme-choice="dark">● 深色</div>
+      </div>
+    </div>
+    <div class="field-block">
+      <label>資料備份（所有資料只存在這個瀏覽器本機，換裝置或清快取會遺失，建議定期備份）</label>
+      <div class="row"><button class="btn secondary block" id="exportBackupBtn">匯出備份（JSON）</button></div>
+      <div class="row">
+        <input type="file" id="importBackupFile" accept=".json">
+        <button class="btn secondary" id="importBackupBtn">匯入備份</button>
+      </div>
+      <div class="status-line" id="backupStatus"></div>
+    </div>
+    <button class="modal-close" id="settingsCloseBtn">完成</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="reportOverlay">
+  <div class="modal-sheet" id="reportSheet">
+    <div class="modal-handle no-print"></div>
+    <div class="report-print-area" id="reportPrintArea">
+      <div class="modal-title" id="reportTitle">週報／月報</div>
+      <div class="row no-print" style="margin-bottom:10px;">
+        <button class="btn secondary" id="reportWeekBtn">本週</button>
+        <button class="btn secondary" id="reportMonthBtn">本月</button>
+      </div>
+      <div id="reportBody"></div>
+    </div>
+    <div class="row no-print" style="margin-top:14px;">
+      <button class="btn block" id="reportDownloadPdfBtn">下載 PDF</button>
+    </div>
+    <button class="modal-close no-print" id="reportCloseBtn">關閉</button>
+  </div>
+</div>
+
+<script>
+/* ================= constants ================= */
+/* ================= storage abstraction =================
+ * Real Claude.ai artifacts get a live window.storage bridge; a plain
+ * downloaded HTML file opened directly in a browser does not, so this falls
+ * back to localStorage there.
+ *
+ * Important: earlier this tried window.storage fresh on EVERY call and fell
+ * back to localStorage per-call on failure. Under the rate limiting
+ * Anthropic's own docs mention, that risks a "split-brain" state — some
+ * writes landing in window.storage, others silently landing in localStorage
+ * instead, with reads then inconsistently seeing whichever one happens to
+ * respond first. That's a very plausible explanation for data that appears
+ * to vanish or revert to an older state. Fixed by detecting which backend
+ * actually works ONCE per session (real round-trip test, not just presence),
+ * then committing to that single backend for every read/write afterward —
+ * so a read can never come from a different store than the write that made it. */
+let storageBackend = null; // "window" | "local", decided once and cached
+async function detectStorageBackend(){
+  if(storageBackend) return storageBackend;
+  if(typeof window.storage !== "undefined"){
+    try {
+      const probeKey = "__secretary_backend_probe__";
+      const setResult = await window.storage.set(probeKey, "1");
+      if(setResult){
+        const getResult = await window.storage.get(probeKey);
+        if(getResult && getResult.value === "1"){
+          storageBackend = "window";
+          return storageBackend;
+        }
+      }
+    } catch(e){}
+  }
+  storageBackend = "local";
+  return storageBackend;
+}
+const secStorage = {
+  async get(key){
+    const backend = await detectStorageBackend();
+    if(backend === "window"){
+      try { return await window.storage.get(key); } catch(e){ return null; }
+    }
+    try {
+      const v = localStorage.getItem("secLocal:" + key);
+      return v === null ? null : { key, value: v };
+    } catch(e){ return null; }
+  },
+  async set(key, value){
+    const backend = await detectStorageBackend();
+    if(backend === "window"){
+      try { return await window.storage.set(key, value); } catch(e){ return null; }
+    }
+    try { localStorage.setItem("secLocal:" + key, value); return { key, value }; } catch(e){ return null; }
+  },
+  // Lists every key currently stored by this app, regardless of backend —
+  // needed for full-data export/import since individual per-item state keys
+  // (done/note/prep/transit, one per tracked item or event) are created
+  // dynamically and aren't known ahead of time.
+  async list(){
+    const backend = await detectStorageBackend();
+    if(backend === "window"){
+      try { const r = await window.storage.list(); return (r && r.keys) ? r.keys : []; } catch(e){ return []; }
+    }
+    try {
+      const keys = [];
+      for(let i=0;i<localStorage.length;i++){
+        const k = localStorage.key(i);
+        if(k && k.startsWith("secLocal:")) keys.push(k.slice("secLocal:".length));
+      }
+      return keys;
+    } catch(e){ return []; }
+  },
+  async delete(key){
+    const backend = await detectStorageBackend();
+    if(backend === "window"){
+      try { return await window.storage.delete(key); } catch(e){ return null; }
+    }
+    try { localStorage.removeItem("secLocal:" + key); return { key, deleted:true }; } catch(e){ return null; }
+  }
+};
+
+const CONC_FACTORS = { "M":1, "mM":1e-3, "uM":1e-6, "nM":1e-9, "pM":1e-12 };
+const CONC_LABELS = { "M":"M", "mM":"mM", "uM":"µM", "nM":"nM", "pM":"pM" };
+const TW_STATIONS = { "台北":"台北","板橋":"板橋","桃園":"桃園","新竹":"新竹","苗栗":"苗栗","台中":"台中","彰化":"彰化","雲林":"雲林","嘉義":"嘉義","台南":"台南","高雄":"左營" };
+// Full city/county list for the weather picker — independent of TW_STATIONS,
+// which only covers places with a THSR stop and is used solely for the
+// THSR ticket-suggestion chip elsewhere.
+
+
+const HOME_CITY_KEY = "secretary-home-city";
+const VIP_KEY = "secretary-vip-list";
+const REPLY_SIGNATURE_KEY = "secretary-reply-signature";
+const TRACKED_KEY = "secretary-tracked-list";
+const LAB_GROUPS_KEY = "secretary-lab-groups-v2";
+const LAB_NOTE_KEY = "secretary-lab-methods-v2";
+const LAB_SEEDED_KEY = "secretary-lab-seeded-v2";
+const THEME_KEY = "secretary-theme";
+
+const SEED_LAB_GROUPS = [
+  { id:"grp-seed-1", purpose:"", control:"", note:"",
+    treatments:[{ id:"grp-seed-1-t1", text:"MCD+Nafomastat" }, { id:"grp-seed-1-t2", text:"MCD+Nafomastat+Marimastat" }] },
+  { id:"grp-seed-2", purpose:"", control:"", note:"",
+    treatments:[{ id:"grp-seed-2-t1", text:"Fibrinogenolysis+Nafomastat" }] }
+];
+const SEED_LAB_NOTES = [
+  { id:"note-seed-1", title:"Nafomastat 與 venom 反應", body:"Nafomastat 20mM stock取1uL+20uL venom, incubate 37度C 30分鐘" },
+  { id:"note-seed-2", title:"Fibrinogen 受質配置", body:"Fibrinogen 2mg/mL 泡2mL" },
+  { id:"note-seed-3", title:"Marimastat 稀釋", body:"Marimastat(20mM stock)取5uL+PBS 45uL" },
+  { id:"note-seed-4", title:"Nafomastat 稀釋（PBS版）", body:"Nafomastat(20mM stock) 取10uL+PBS 90uL" }
+];
+
+// Real events pulled from the user's Google Calendar (工作/聚會) — seeded once
+// into the custom-events store below, then behaves exactly like anything
+// they add/import themselves (editable, deletable, offset computed live).
+const REAL_CALENDAR_SEED = [
+  { id:"gcal-1", subject:"值", date:"2026-08-18", time:"07:30-16:00", location:"" },
+  { id:"gcal-2", subject:"嘉長 解毒劑", date:"2026-08-19", time:"10:00", location:"嘉義" },
+  { id:"gcal-3", subject:"1", date:"2026-08-27", time:"09:00", location:"" },
+  { id:"gcal-4", subject:"值", date:"2026-08-24", time:"07:30-16:00", location:"" },
+  { id:"gcal-5", subject:"8:00-17:00 三總", date:"2026-08-25", time:"09:00", location:"B1 第二演講廳" },
+  { id:"gcal-6", subject:"poster交稿", date:"2026-08-28", time:"09:00", location:"" },
+  { id:"gcal-7", subject:"值", date:"2026-08-31", time:"07:30-16:00", location:"" },
+  { id:"gcal-8", subject:"E", date:"2026-09-01", time:"16:00-22:00", location:"" },
+  { id:"gcal-9", subject:"留", date:"2026-09-03", time:"12:30-14:30", location:"" },
+  { id:"gcal-10", subject:"部會", date:"2026-09-03", time:"12:30-16:00", location:"" },
+  { id:"gcal-11", subject:"9:00-10:00 R501工作討論", date:"2026-09-04", time:"09:00", location:"" },
+  { id:"gcal-12", subject:"14:00 jump", date:"2026-09-04", time:"09:00", location:"" },
+  { id:"gcal-13", subject:"10:40 招標", date:"2026-09-08", time:"09:00", location:"" },
+  { id:"gcal-14", subject:"APAMT籌備會", date:"2026-09-10", time:"09:00", location:"" }
+];
+// Known shift-duty codes with their standard hours, so the app can label
+// them correctly even from bare single-character calendar entries.
+const SHIFT_CODES = { "值":"07:30-16:00", "留":"12:30-14:30", "部會":"12:30-16:00", "E":"16:00-22:00", "N":"22:00-08:00(隔天)" };
+const CAL_EVENTS = [];
+const TEACHING_EVENTS = [];
+const NOISE = ["電商特賣活動","航空哩程通知","訂閱電子報","會員優惠活動","信用卡消費回報（僅供存查）","品牌新品快訊","展會邀請行銷信","App 更新通知"];
+
+/* ================= brand mark & favicon ================= */
+function brandMarkSvgMarkup(){
+  return `<svg viewBox="0 0 88 88" fill="none">
+    <path d="M60.4 55.5 A20 20 0 1 1 60.4 32.5" style="stroke:var(--mark-c)" stroke-width="9.6" stroke-linecap="round"/>
+    <path d="M45.5 34 L45.5 54 L54.5 54" style="stroke:var(--mark-l)" stroke-width="4.8" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+}
+function updateFavicon(theme){
+  const cCol = theme === "dark" ? "%23B98CA0" : "%233A4854";
+  const lCol = theme === "dark" ? "%23D9AE5C" : "%23C4962E";
+  const bg = theme === "dark" ? "%23241E1A" : "%23F2EEE7";
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 88 88'><rect width='88' height='88' rx='18' fill='${bg}'/><path d='M60.4 55.5 A20 20 0 1 1 60.4 32.5' stroke='${cCol}' stroke-width='9.6' stroke-linecap='round' fill='none'/><path d='M45.5 34 L45.5 54 L54.5 54' stroke='${lCol}' stroke-width='4.8' stroke-linecap='round' stroke-linejoin='round' fill='none'/></svg>`;
+  document.getElementById("favicon").href = "data:image/svg+xml," + svg;
+}
+
+/* ================= theme ================= */
+async function getTheme(){ try { const r = await secStorage.get(THEME_KEY); return r ? r.value : "light"; } catch(e){ return "light"; } }
+async function setTheme(v){ try { await secStorage.set(THEME_KEY, v); } catch(e){} }
+function applyTheme(theme){
+  document.body.setAttribute("data-theme", theme);
+  document.querySelectorAll(".theme-opt").forEach(el => el.classList.toggle("active", el.dataset.themeChoice === theme));
+  updateFavicon(theme);
+}
+
+/* ================= custom calendar events (manual add / .ics import) ================= */
+const CUSTOM_EVENTS_KEY = "secretary-custom-events";
+async function getCustomEvents(){ try { const r = await secStorage.get(CUSTOM_EVENTS_KEY); return r ? JSON.parse(r.value) : []; } catch(e){ return []; } }
+async function setCustomEvents(list){ try { await secStorage.set(CUSTOM_EVENTS_KEY, JSON.stringify(list)); } catch(e){} }
+const REAL_CAL_SEEDED_KEY = "secretary-real-cal-seeded";
+async function ensureRealCalendarSeed(){
+  try { const seeded = await secStorage.get(REAL_CAL_SEEDED_KEY); if(seeded) return; } catch(e){}
+  const existing = await getCustomEvents();
+  if(existing.length === 0) await setCustomEvents(REAL_CALENDAR_SEED);
+  try { await secStorage.set(REAL_CAL_SEEDED_KEY, "1"); } catch(e){}
+}
+// One-time fixup for anyone who already seeded calendar data before shift-code
+// hours and the 嘉長→嘉義 location were known. Only touches entries that still
+// have the original placeholder values, so it never overwrites a manual edit.
+const DATA_FIXUP_KEY = "secretary-data-fixup-v1";
+async function applyDataFixups(){
+  try { const done = await secStorage.get(DATA_FIXUP_KEY); if(done) return; } catch(e){}
+  const events = await getCustomEvents();
+  let changed = false;
+  for(const ev of events){
+    if(SHIFT_CODES[ev.subject] && ev.time === "09:00"){ ev.time = SHIFT_CODES[ev.subject]; changed = true; }
+    if(ev.id === "gcal-2" && !ev.location){ ev.location = "嘉義"; changed = true; }
+  }
+  if(changed) await setCustomEvents(events);
+  try { await secStorage.set(DATA_FIXUP_KEY, "1"); } catch(e){}
+}
+function offsetFromDate(dateStr){
+  const today = new Date(); today.setHours(0,0,0,0);
+  const d = new Date(dateStr + "T00:00:00");
+  return Math.round((d - today) / 86400000);
+}
+// Merges the illustrative demo events with whatever the user has actually
+// added/imported. Custom events carry a real ISO date; offset is computed
+// fresh on every render so it's always accurate for "today".
+async function getAllCalEvents(){
+  const custom = await getCustomEvents();
+  const customShaped = custom.map(c => ({
+    id: c.id, subject: c.subject, offset: offsetFromDate(c.date), date: c.date,
+    time: c.time || "", location: c.location || "", calendar: "自訂", contact: "",
+    isCustom: true, isTeachingInvite: !!c.isTeachingInvite, needsPrep: !!c.needsPrep
+  }));
+  return [...CAL_EVENTS, ...customShaped];
+}
+function parseICS(text){
+  const events = [];
+  const blocks = text.split("BEGIN:VEVENT").slice(1);
+  for(const block of blocks){
+    const body = block.split("END:VEVENT")[0];
+    const getField = (name) => {
+      const re = new RegExp("(?:^|\\n)" + name + "(;[^:\\n]*)?:([^\\n\\r]+)", "i");
+      const m = body.match(re);
+      return m ? m[2].trim() : "";
+    };
+    const summary = getField("SUMMARY").replace(/\\,/g, ",").replace(/\\n/gi, " ");
+    const location = getField("LOCATION").replace(/\\,/g, ",");
+    const dtstart = getField("DTSTART");
+    if(!dtstart) continue;
+    const dateOnly = dtstart.replace(/[^0-9T]/g, "").slice(0,8);
+    if(dateOnly.length < 8) continue;
+    const y = dateOnly.slice(0,4), mo = dateOnly.slice(4,6), da = dateOnly.slice(6,8);
+    let timeStr = "";
+    if(dtstart.includes("T")){
+      const t = dtstart.split("T")[1].replace(/[^0-9]/g, "");
+      if(t.length >= 4) timeStr = t.slice(0,2) + ":" + t.slice(2,4);
+    }
+    events.push({ subject: summary || "（無標題）", date: `${y}-${mo}-${da}`, time: timeStr, location: location || "" });
+  }
+  return events;
+}
+async function renderCustomEventList(){
+  const list = await getCustomEvents();
+  const wrap = document.getElementById("customEventList");
+  wrap.innerHTML = "";
+  if(list.length === 0) return;
+  const sorted = [...list].sort((a,b) => a.date.localeCompare(b.date));
+  for(const ev of sorted){
+    const card = document.createElement("div");
+    card.className = "note-card";
+    card.innerHTML = `
+      <div class="note-top">
+        <div class="note-title">${ev.subject}${ev.isTeachingInvite ? ' <span class="item-tag tag-info" style="vertical-align:middle;">邀課</span>' : ""}</div>
+        <div style="display:flex;gap:10px;flex-shrink:0;align-items:center;">
+          <span class="mini-btn" style="display:inline-flex;align-items:center;gap:5px;" data-ev-edit-toggle="${ev.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>編輯</span>
+          <span class="note-del" data-ev-del="${ev.id}">刪除</span>
+        </div>
+      </div>
+      <div class="note-body" style="font-family:inherit;">${ev.date}${ev.time ? " · " + ev.time : ""}${ev.location ? " · " + ev.location : ""}</div>
+      ${eventEditBoxHtml(ev)}`;
+    await wireEventEditToggle(card, ev.id);
+    card.querySelector(`[data-ev-del="${ev.id}"]`).addEventListener("click", async () => {
+      const cur = await getCustomEvents();
+      await setCustomEvents(cur.filter(x => x.id !== ev.id));
+      showToast("已刪除", `「${ev.subject}」已從行事曆移除。`);
+      renderCustomEventList(); refreshAll();
+    });
+    wrap.appendChild(card);
+  }
+}
+function setupCalendarImport(){
+  document.getElementById("addEventBtn").addEventListener("click", async () => {
+    const title = document.getElementById("newEventTitle").value.trim();
+    const date = document.getElementById("newEventDate").value;
+    const time = document.getElementById("newEventTime").value.trim();
+    const location = document.getElementById("newEventLocation").value.trim();
+    const isTeach = document.getElementById("newEventTeach").checked;
+    const status = document.getElementById("calImportStatus");
+    if(!title || !date){ status.className = "status-line err"; status.textContent = "請至少填標題與日期。"; return; }
+    const list = await getCustomEvents();
+    list.push({ id:"cev-"+Date.now(), subject:title, date, time, location, isTeachingInvite:isTeach });
+    await setCustomEvents(list);
+    document.getElementById("newEventTitle").value = "";
+    document.getElementById("newEventDate").value = "";
+    document.getElementById("newEventTime").value = "";
+    document.getElementById("newEventLocation").value = "";
+    document.getElementById("newEventTeach").checked = false;
+    status.className = "status-line"; status.textContent = "已新增。";
+    showToast("已新增", `「${title}」已加入行事曆。`);
+    renderCustomEventList(); refreshAll();
+  });
+  document.getElementById("importIcsBtn").addEventListener("click", () => {
+    const fileInput = document.getElementById("icsFile");
+    const status = document.getElementById("calImportStatus");
+    const file = fileInput.files[0];
+    if(!file){ status.className = "status-line err"; status.textContent = "請先選擇 .ics 檔案。"; return; }
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const parsed = parseICS(reader.result);
+        if(parsed.length === 0){ status.className = "status-line err"; status.textContent = "沒有解析到任何事件，檔案格式可能不支援。"; return; }
+        const list = await getCustomEvents();
+        // Skip anything already imported (same title + date) so re-importing the
+        // same monthly export doesn't create duplicate entries.
+        const existingSig = new Set(list.map(e => e.subject + "|" + e.date));
+        let added = 0, skipped = 0;
+        parsed.forEach((p, i) => {
+          const sig = p.subject + "|" + p.date;
+          if(existingSig.has(sig)){ skipped++; return; }
+          list.push({ id:"cev-"+Date.now()+"-"+i, subject:p.subject, date:p.date, time:p.time, location:p.location });
+          existingSig.add(sig);
+          added++;
+        });
+        await setCustomEvents(list);
+        status.className = "status-line";
+        status.textContent = skipped > 0
+          ? `已匯入 ${added} 筆新事件，${skipped} 筆與現有行程重複已跳過。`
+          : `已匯入 ${added} 筆事件。`;
+        showToast(added > 0 ? "已匯入" : "沒有新增任何事件", skipped > 0 ? `新增 ${added} 筆，${skipped} 筆重複已跳過。` : `已匯入 ${added} 筆事件。`);
+        renderCustomEventList(); refreshAll();
+      } catch(err){ status.className = "status-line err"; status.textContent = "匯入失敗：" + friendlyErrorMessage(err); }
+    };
+    reader.readAsText(file);
+  });
+
+  document.getElementById("copyScreenshotPromptBtn").addEventListener("click", async () => {
+    const status = document.getElementById("calImportStatus");
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}-${String(today.getDate()).padStart(2,"0")}`;
+    const prompt = `今天的日期是 ${todayStr}。請閱讀這張行事曆／日曆截圖，擷取所有看得到的行程。只回傳一個 JSON 陣列，不要其他文字、不要 markdown code fence：
+[{"subject":"標題","date":"YYYY-MM-DD","time":"時間或空字串","location":"地點或空字串"}]
+若截圖沒有明確標示年份，請依今天日期推斷最合理的年份。若某個行程完全看不出正確日期，請跳過該筆，不要用今天日期硬填。`;
+    await copyPromptToClipboard(prompt, status, "提示詞已複製 — 到 Claude App 貼上提示詞、附上你的截圖，取得回覆後貼回下面欄位匯入。");
+  });
+  document.getElementById("parseScreenshotReplyBtn").addEventListener("click", async () => {
+    const status = document.getElementById("calImportStatus");
+    const replyInput = document.getElementById("screenshotAiReplyInput");
+    try {
+      const parsed = parseAIJson(replyInput.value);
+      if(!Array.isArray(parsed) || parsed.length === 0){
+        status.className = "status-line err"; status.textContent = "沒有解析到任何行程，請確認貼上的內容正確。";
+        return;
+      }
+      const list = await getCustomEvents();
+      const existingSig = new Set(list.map(e => e.subject + "|" + e.date));
+      let added = 0, skipped = 0, invalid = 0;
+      parsed.forEach((p, i) => {
+        if(!p.date || !/^\d{4}-\d{2}-\d{2}$/.test(p.date)){ invalid++; return; }
+        const sig = (p.subject||"") + "|" + p.date;
+        if(existingSig.has(sig)){ skipped++; return; }
+        list.push({ id:"cev-"+Date.now()+"-"+i, subject:p.subject||"（未命名）", date:p.date, time:p.time||"", location:p.location||"" });
+        existingSig.add(sig);
+        added++;
+      });
+      await setCustomEvents(list);
+      status.className = "status-line";
+      status.textContent = `已從截圖匯入 ${added} 筆新事件`
+        + (skipped>0 ? `，${skipped} 筆重複已跳過` : "")
+        + (invalid>0 ? `，${invalid} 筆日期無法判讀已略過` : "")
+        + "。建議檢查一下判讀是否正確。";
+      showToast(added > 0 ? "已匯入" : "沒有新增任何事件", `新增 ${added} 筆${skipped>0 ? `，${skipped} 筆重複已跳過` : ""}。`);
+      replyInput.value = "";
+      renderCustomEventList(); refreshAll();
+    } catch(err){
+      status.className = "status-line err"; status.textContent = friendlyErrorMessage(err);
+    }
+  });
+}
+
+/* ================= generic per-item state ================= */
+function storageKey(id){ return "secretary:" + id; }
+// Consolidated storage: every per-item state (done/note/prep/sent…) used to
+// live under its own key ("secretary:<id>"), and every transit checklist
+// under its own ("secretary-transit:<id>"). With 14+ calendar entries plus
+// docs/actions/lab items, a single render cycle was firing 100+ individual
+// storage calls (measured: 129 on first load) — far past what the storage
+// API's own guidance says is safe ("batch related data in single keys...
+// rate limited"), and the most likely explanation for events appearing to
+// vanish after a save: a read made during/after that burst can fail under
+// rate limiting, and every read failure here was being silently treated as
+// "no data" rather than surfaced as an error. Now all item states share one
+// key and all transit states share one key, each cached in memory for the
+// session after a single initial read — so a save is one write to one key,
+// not a fresh swarm of calls, and normal usage can't trip a per-key limit.
+const ITEM_STATES_KEY = "secretary-item-states";
+let itemStatesCache = null;
+async function loadItemStatesCache(){
+  if(itemStatesCache) return itemStatesCache;
+  try { const r = await secStorage.get(ITEM_STATES_KEY); itemStatesCache = r ? JSON.parse(r.value) : {}; }
+  catch(e){ itemStatesCache = {}; }
+  return itemStatesCache;
+}
+async function getState(id){
+  const cache = await loadItemStatesCache();
+  return cache[id] || { done:false, note:"", prep:"" };
+}
+async function setState(id, state){
+  const cache = await loadItemStatesCache();
+  cache[id] = state;
+  try { await secStorage.set(ITEM_STATES_KEY, JSON.stringify(cache)); } catch(e){}
+}
+// One-time migration from the old one-key-per-item scheme into the
+// consolidated keys above — runs once (gated by a flag), so anyone with
+// existing done/note/prep/transit data doesn't see it reset to defaults
+// when this update lands. Safe to skip if there's nothing to migrate.
+const STATE_MIGRATION_KEY = "secretary-state-migration-v1";
+async function migrateStatesIfNeeded(){
+  try { const done = await secStorage.get(STATE_MIGRATION_KEY); if(done) return; } catch(e){}
+  try {
+    const keys = await secStorage.list();
+    const itemMap = {}, transitMap = {};
+    for(const k of keys){
+      if(k.startsWith("secretary-transit:")){
+        const r = await secStorage.get(k);
+        if(r){ try { transitMap[k.slice("secretary-transit:".length)] = JSON.parse(r.value); } catch(e){} }
+      } else if(k.startsWith("secretary:")){
+        const r = await secStorage.get(k);
+        if(r){ try { itemMap[k.slice("secretary:".length)] = JSON.parse(r.value); } catch(e){} }
+      }
+    }
+    if(Object.keys(itemMap).length > 0) await secStorage.set(ITEM_STATES_KEY, JSON.stringify(itemMap));
+    if(Object.keys(transitMap).length > 0) await secStorage.set(TRANSIT_STATES_KEY, JSON.stringify(transitMap));
+    // Clean up the old individual keys now that their data lives in the
+    // consolidated key — otherwise they'd keep showing up in secStorage.list()
+    // forever (bloating backups, and re-creating the original many-small-calls
+    // problem every time something iterates all keys, e.g. backup export).
+    for(const id of Object.keys(itemMap)) await secStorage.delete("secretary:" + id);
+    for(const id of Object.keys(transitMap)) await secStorage.delete("secretary-transit:" + id);
+  } catch(e){}
+  try { await secStorage.set(STATE_MIGRATION_KEY, "1"); } catch(e){}
+}
+
+async function getHomeCity(){ try { const r = await secStorage.get(HOME_CITY_KEY); return r ? r.value : "台北"; } catch(e){ return "台北"; } }
+async function setHomeCity(v){ try { await secStorage.set(HOME_CITY_KEY, v); } catch(e){} }
+async function getVipList(){ try { const r = await secStorage.get(VIP_KEY); return r ? r.value : ""; } catch(e){ return ""; } }
+async function setVipList(v){ try { await secStorage.set(VIP_KEY, v); } catch(e){} }
+async function getReplySignature(){ try { const r = await secStorage.get(REPLY_SIGNATURE_KEY); return r ? r.value : ""; } catch(e){ return ""; } }
+async function setReplySignature(v){ try { await secStorage.set(REPLY_SIGNATURE_KEY, v); } catch(e){} }
+async function getTracked(){ try { const r = await secStorage.get(TRACKED_KEY); return r ? JSON.parse(r.value) : []; } catch(e){ return []; } }
+async function setTracked(list){ try { await secStorage.set(TRACKED_KEY, JSON.stringify(list)); } catch(e){} }
+async function getLabGroups(){ try { const r = await secStorage.get(LAB_GROUPS_KEY); return r ? JSON.parse(r.value) : []; } catch(e){ return []; } }
+async function setLabGroups(list){ try { await secStorage.set(LAB_GROUPS_KEY, JSON.stringify(list)); } catch(e){} }
+async function getLabNotes(){ try { const r = await secStorage.get(LAB_NOTE_KEY); return r ? JSON.parse(r.value) : []; } catch(e){ return []; } }
+async function setLabNotes(list){ try { await secStorage.set(LAB_NOTE_KEY, JSON.stringify(list)); } catch(e){} }
+async function ensureLabSeed(){
+  try { const seeded = await secStorage.get(LAB_SEEDED_KEY); if(seeded) return; } catch(e){}
+  const groups = await getLabGroups(); const notes = await getLabNotes();
+  if(groups.length === 0) await setLabGroups(SEED_LAB_GROUPS);
+  if(notes.length === 0) await setLabNotes(SEED_LAB_NOTES);
+  try { await secStorage.set(LAB_SEEDED_KEY, "1"); } catch(e){}
+}
+
+function isVip(contact, vipRaw){
+  if(!contact || !vipRaw) return false;
+  const keywords = vipRaw.split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
+  const c = contact.toLowerCase();
+  return keywords.some(k => k && c.includes(k));
+}
+function urgencyOf(offset){
+  if(offset === null || offset === undefined) return { tier:"info", tag:"tag-info", label:"待確認" };
+  if(offset < 0) return { tier:"overdue", tag:"tag-overdue", label:`已逾期 ${Math.abs(offset)} 天` };
+  if(offset === 0) return { tier:"urgent", tag:"tag-urgent", label:"今天" };
+  if(offset === 1) return { tier:"urgent", tag:"tag-urgent", label:"明天" };
+  if(offset <= 3) return { tier:"soon", tag:"tag-soon", label:`${offset} 天後` };
+  return { tier:"calm", tag:"tag-calm", label:`${offset} 天後` };
+}
+const TIER_ORDER = { overdue:0, urgent:1, soon:2, calm:3, info:4 };
+function effectiveTier(offset, vip){
+  const base = TIER_ORDER[urgencyOf(offset).tier];
+  return vip ? Math.max(0, base-1) : base;
+}
+// A fixed, high-contrast confirmation that's genuinely hard to miss — unlike
+// a small inline text change buried inside a card, which testing showed
+// people don't notice, especially when the action they expected (mail app
+// opening) silently doesn't happen.
+function showToast(title, body, durationMs){
+  const toast = document.getElementById("globalToast");
+  toast.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+    <div><div class="gt-title">${title}</div><div>${body}</div></div>`;
+  toast.classList.add("show");
+  clearTimeout(toast._hideTimer);
+  toast._hideTimer = setTimeout(() => { toast.classList.remove("show"); }, durationMs || 4500);
+}
+// Opens the device's own mail app pre-filled as a reminder-to-self. mailto:
+// links cannot carry attachments (a real browser/platform limitation) — the
+// document text goes in the body instead, not as a file. Testing with a real
+// user confirmed the mail app does NOT reliably open inside the artifact
+// sandbox, so the clipboard copy — not the mailto attempt — is treated as
+// the actual promised behavior, with a confirmation that's impossible to miss.
+function mailReminderLink(subject, bodyText, label){
+  return `<span class="mail-reminder-link" data-mail-subject="${encodeURIComponent(subject)}" data-mail-body="${encodeURIComponent(bodyText || "")}">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
+    <span class="mail-label">${label || "寄提醒信給自己"}</span></span>`;
+}
+function setupMailReminderDelegation(){
+  document.addEventListener("click", async (e) => {
+    const el = e.target.closest(".mail-reminder-link");
+    if(!el) return;
+    const subject = decodeURIComponent(el.getAttribute("data-mail-subject") || "");
+    const body = decodeURIComponent(el.getAttribute("data-mail-body") || "");
+    let copied = false;
+    try { await navigator.clipboard.writeText(`主旨：${subject}\n\n${body}`); copied = true; } catch(err){}
+    try { window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`; } catch(err){}
+    if(copied){
+      showToast("內容已複製", "如果沒有自動跳出寄信 App，請自行打開信箱貼上（Ctrl/Cmd+V）送出。");
+    } else {
+      showToast("複製失敗", "請手動選取並複製內容，貼到你的信箱裡。", 6000);
+    }
+  });
+}
+// Shared inline-edit widget for a calendar entry — used both on the item
+// cards directly (今日/本月) and in the "＋新增或匯入行事曆" list, so editing
+// a real calendar entry works from wherever you're actually looking at it.
+function eventEditToggleHtml(id){
+  return `<div class="row" style="margin-top:8px;"><span class="mini-btn" style="display:inline-flex;align-items:center;gap:5px;" data-ev-edit-toggle="${id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>編輯這筆行程</span></div>`;
+}
+function eventEditBoxHtml(ev){
+  return `<div class="edit-box" data-ev-editbox="${ev.id}" style="display:none;">
+    <input type="text" data-ev-f="title" value="${(ev.subject||"").replace(/"/g,'&quot;')}" placeholder="標題">
+    <div class="row" style="margin-top:8px;">
+      <input type="date" data-ev-f="date" value="${ev.date||""}">
+      <input type="text" data-ev-f="time" value="${ev.time||""}" placeholder="時間，例如 07:30-16:00">
+    </div>
+    <input type="text" data-ev-f="location" value="${ev.location||""}" placeholder="地點（選填）" style="margin-top:8px;">
+    <label style="display:flex;align-items:center;gap:7px;margin-top:10px;font-size:13px;cursor:pointer;">
+      <input type="checkbox" data-ev-f="teach" ${ev.isTeachingInvite?"checked":""} style="width:18px;height:18px;accent-color:var(--mark-c);"> 這是邀課邀請
+    </label>
+    <label style="display:flex;align-items:center;gap:7px;margin-top:8px;font-size:13px;cursor:pointer;">
+      <input type="checkbox" data-ev-f="prep" ${ev.needsPrep?"checked":""} style="width:18px;height:18px;accent-color:var(--mark-c);"> 需要準備資料或簡報
+    </label>
+    <div class="row"><button class="btn secondary" data-ev-save="${ev.id}">儲存修改</button></div>
+  </div>`;
+}
+async function wireEventEditToggle(container, id){
+  const toggle = container.querySelector(`[data-ev-edit-toggle="${id}"]`);
+  const box = container.querySelector(`[data-ev-editbox="${id}"]`);
+  if(!toggle || !box) return;
+  toggle.addEventListener("click", () => { box.style.display = box.style.display === "none" ? "block" : "none"; });
+  box.querySelector(`[data-ev-save="${id}"]`).addEventListener("click", async () => {
+    try {
+      const cur = await getCustomEvents();
+      const idx = cur.findIndex(x => x.id === id);
+      if(idx >= 0){
+        const titleVal = box.querySelector('[data-ev-f="title"]').value.trim();
+        const dateVal = box.querySelector('[data-ev-f="date"]').value;
+        cur[idx].subject = titleVal || cur[idx].subject;
+        cur[idx].date = dateVal || cur[idx].date;
+        cur[idx].time = box.querySelector('[data-ev-f="time"]').value.trim();
+        cur[idx].location = box.querySelector('[data-ev-f="location"]').value.trim();
+        cur[idx].isTeachingInvite = box.querySelector('[data-ev-f="teach"]').checked;
+        cur[idx].needsPrep = box.querySelector('[data-ev-f="prep"]').checked;
+        await setCustomEvents(cur);
+        showToast("已更新", `「${cur[idx].subject}」的異動已儲存。`);
+      }
+      await refreshAll();
+    } catch(err){ showDebugError("編輯行程儲存", err); }
+  });
+}
+// Finds which known TW_STATIONS city name is contained anywhere in a free-text
+// location string (e.g. "高雄醫學大學第一演講廳" → "高雄"). An AI-extracted
+// location is a full venue name far more often than a bare city name, so an
+// exact-match lookup against TW_STATIONS silently missed almost every real
+// case — this made the THSR/交通核銷 features look broken even though the
+// location data was there, just not in the exact shape being looked up.
+function matchCity(location){
+  if(!location) return null;
+  const candidates = Object.keys(TW_STATIONS).filter(city => location.includes(city));
+  if(candidates.length === 0) return null;
+  // Prefer the longest matching city name (avoids a short substring like a
+  // coincidental match inside a longer, more specific one, if that ever comes up).
+  candidates.sort((a,b) => b.length - a.length);
+  return candidates[0];
+}
+function thsrChip(location, homeCity){
+  if(!location || location === homeCity) return "";
+  const city = matchCity(location);
+  if(!city || city === homeCity) return "";
+  const station = TW_STATIONS[city];
+  if(!station) return "";
+  return `<div class="thsr-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="14" rx="4"/><path d="M4 11h16M8 17l-2 4M16 17l2 4M9 7h2M13 7h2"/></svg>
+    地點在${location}，非常駐城市（${homeCity}）— 建議搭高鐵至<b>${station}站</b>。
+    <a href="https://www.thsrc.com.tw" target="_blank" rel="noopener">前往訂票網站</a></div>`;
+}
+// Same trigger condition as the THSR chip — any event requiring travel away
+// from the home city also gets a receipt/reimbursement mini-checklist.
+function isTransitEvent(location, homeCity){
+  const city = matchCity(location);
+  return !!(city && city !== homeCity);
+}
+const TRANSIT_STATES_KEY = "secretary-transit-states";
+let transitStatesCache = null;
+async function loadTransitStatesCache(){
+  if(transitStatesCache) return transitStatesCache;
+  try { const r = await secStorage.get(TRANSIT_STATES_KEY); transitStatesCache = r ? JSON.parse(r.value) : {}; }
+  catch(e){ transitStatesCache = {}; }
+  return transitStatesCache;
+}
+async function getTransitState(id){
+  const cache = await loadTransitStatesCache();
+  return cache[id] || { receiptDone:false, receiptHidden:false, reimburseDone:false, reimburseHidden:false, reimburseDate:"", amount:"" };
+}
+async function setTransitState(id, state){
+  const cache = await loadTransitStatesCache();
+  cache[id] = state;
+  try { await secStorage.set(TRANSIT_STATES_KEY, JSON.stringify(cache)); } catch(e){}
+}
+function transitBoxHtml(id, state){
+  const receiptRow = state.receiptHidden ? "" : `
+    <div class="t-row">
+      <label><input type="checkbox" data-t-receipt="${id}" ${state.receiptDone?"checked":""}/> 已繳交單據</label>
+      <span class="t-del" data-t-receipt-del="${id}">刪除</span>
+    </div>`;
+  const reimburseRow = state.reimburseHidden ? "" : `
+    <div class="t-row">
+      <label><input type="checkbox" data-t-reimburse="${id}" ${state.reimburseDone?"checked":""}/> 已核銷入帳</label>
+      <input type="number" inputmode="numeric" placeholder="金額" data-t-amount="${id}" value="${state.amount||""}" style="width:70px;">
+      <input type="date" data-t-reimburse-date="${id}" value="${state.reimburseDate||""}">
+      <span class="t-del" data-t-reimburse-del="${id}">刪除</span>
+    </div>`;
+  if(!receiptRow && !reimburseRow) return "";
+  return `<div class="transit-box" data-transit-wrap="${id}"><div class="t-label">交通核銷</div>${receiptRow}${reimburseRow}</div>`;
+}
+// Deliberately separate from the shared per-item state/date system — the
+// reimbursement date here is a personal record, not a due date, so it must
+// never feed into urgency sorting or the aggregated to-do list.
+async function wireTransitBox(container, id){
+  const wrapEl = container.querySelector(`[data-transit-wrap="${id}"]`);
+  if(!wrapEl) return;
+  const receiptCb = wrapEl.querySelector(`[data-t-receipt="${id}"]`);
+  if(receiptCb) receiptCb.addEventListener("change", async (e) => {
+    const s = await getTransitState(id); s.receiptDone = e.target.checked; await setTransitState(id, s);
+  });
+  const receiptDel = wrapEl.querySelector(`[data-t-receipt-del="${id}"]`);
+  if(receiptDel) receiptDel.addEventListener("click", async () => {
+    const s = await getTransitState(id); s.receiptHidden = true; await setTransitState(id, s);
+    showToast("已隱藏", "「已繳交單據」項目已從這筆行程移除。");
+    refreshAll();
+  });
+  const reimburseCb = wrapEl.querySelector(`[data-t-reimburse="${id}"]`);
+  if(reimburseCb) reimburseCb.addEventListener("change", async (e) => {
+    const s = await getTransitState(id); s.reimburseDone = e.target.checked; await setTransitState(id, s);
+  });
+  const amountEl = wrapEl.querySelector(`[data-t-amount="${id}"]`);
+  if(amountEl) amountEl.addEventListener("change", async (e) => {
+    const s = await getTransitState(id); s.amount = e.target.value; await setTransitState(id, s);
+  });
+  const reimburseDateEl = wrapEl.querySelector(`[data-t-reimburse-date="${id}"]`);
+  if(reimburseDateEl) reimburseDateEl.addEventListener("change", async (e) => {
+    const s = await getTransitState(id); s.reimburseDate = e.target.value; await setTransitState(id, s);
+  });
+  const reimburseDel = wrapEl.querySelector(`[data-t-reimburse-del="${id}"]`);
+  if(reimburseDel) reimburseDel.addEventListener("click", async () => {
+    const s = await getTransitState(id); s.reimburseHidden = true; await setTransitState(id, s);
+    showToast("已隱藏", "「已核銷入帳」項目已從這筆行程移除。");
+    refreshAll();
+  });
+}
+
+/* ================= AI call helper ================= */
+// Design change 2026-08-16: this app no longer calls any AI API directly.
+// Both window.claude.complete() (deprecated by Anthropic in July 2025) and a
+// direct fetch() to api.anthropic.com only work inside claude.ai's own
+// Artifact sandbox — once this file is published as a standalone webpage
+// (e.g. GitHub Pages), neither path can work: there's no claude.ai session
+// to bill the call against, and a plain webpage calling api.anthropic.com
+// directly gets blocked by CORS with no way around it. So instead of calling
+// an AI, every AI-assisted feature here builds a ready-to-use prompt, copies
+// it to the clipboard, and asks the user to paste it into Claude (or any
+// other generative AI) themselves, then paste the reply back in to be
+// parsed. This keeps every feature usable after publishing, at the cost of
+// one manual round trip instead of an automatic one.
+function friendlyErrorMessage(err){
+  const msg = (err && err.message) ? err.message : String(err);
+  if(err && err.name === "SyntaxError"){
+    return `貼上的內容不是有效的 JSON 格式（${msg}）。請確認複製的是 AI 回覆的完整內容，且沒有多餘的文字或符號。`;
+  }
+  return msg;
+}
+// Copies text to the clipboard and reports success/failure through a status
+// element, since clipboard access can silently fail depending on the browser
+// / permissions context. Also fires the same high-contrast toast used
+// elsewhere (mail reminder) — a small status-line change alone was reported
+// as easy to miss / "feels like nothing happened".
+async function copyPromptToClipboard(text, statusEl, successNote){
+  try {
+    await navigator.clipboard.writeText(text);
+    statusEl.className = "status-line";
+    statusEl.textContent = successNote || "提示詞已複製，貼到 Claude App（或其他生成式AI）取得回覆後，再貼回下面的欄位。";
+    showToast("提示詞已複製", successNote || "貼到 Claude App（或其他生成式AI）取得回覆後，再貼回下面的欄位。");
+    return true;
+  } catch(err){
+    statusEl.className = "status-line err";
+    statusEl.textContent = "複製失敗，請手動選取並複製提示詞文字。";
+    showToast("複製失敗", "請手動選取並複製提示詞文字。", 6000);
+    return false;
+  }
+}
+// Diagnostic-first JSON parsing for AI responses. The previous plain
+// JSON.parse(...) gave no visibility into what was actually received when it
+// failed — this makes the next failure self-explanatory instead of another
+// Parses the AI's reply that the user pastes back in manually. Since this is
+// now always human-pasted text (not a live API response), the failure modes
+// are simpler: either it's empty, or it's not valid JSON.
+function parseAIJson(raw){
+  if(typeof raw !== "string" || raw.trim().length === 0){
+    throw new Error(`欄位是空的，請先貼上 AI 回覆的內容。`);
+  }
+  const cleaned = raw.replace(/```json|```/g, "").trim();
+  try {
+    return JSON.parse(cleaned);
+  } catch(err){
+    const preview = cleaned.length > 200 ? cleaned.slice(0,200) + "…（後面還有 " + (cleaned.length-200) + " 字元）" : cleaned;
+    throw new Error(`JSON 解析失敗（${err.message}）。請確認貼上的是完整的 JSON、且沒有多餘文字。實際收到：${preview}`);
+  }
+}
+/* ================= generic item card ================= */
+function prepBoxHtml(id, prepText){
+  return `<div class="prep-box" data-prep-wrap="${id}">
+      <div class="lbl"><span>會前準備重點</span><button class="mini-btn" data-prep-ai="${id}">複製提示詞</button></div>
+      <textarea data-prep="${id}" placeholder="先手動記下重點，或按右上角按鈕複製提示詞去問 AI，再把回覆貼在這裡…">${prepText || ""}</textarea>
+      <div class="mini-status" data-prep-status="${id}"></div>
+    </div>`;
+}
+function wirePrepBox(container, id, subject, metaLine){
+  const wrapEl = container.querySelector(`[data-prep-wrap="${id}"]`);
+  if(!wrapEl) return;
+  const textarea = wrapEl.querySelector(`[data-prep="${id}"]`);
+  const btn = wrapEl.querySelector(`[data-prep-ai="${id}"]`);
+  const status = wrapEl.querySelector(`[data-prep-status="${id}"]`);
+  let t;
+  textarea.addEventListener("input", () => {
+    clearTimeout(t);
+    t = setTimeout(async () => { const s = await getState(id); s.prep = textarea.value; await setState(id, s); }, 400);
+  });
+  btn.addEventListener("click", async () => {
+    const prompt = `你是行政秘書。以下是一場即將召開的會議／行程，請給我 3-4 點簡短的會前準備建議（可能包含要準備的資料、簡報／投影片、報告等），用條列式，繁體中文，每點不超過20字：\n主旨：${subject}\n時間地點：${metaLine}\n已記錄的準備內容：${textarea.value || "（無）"}`;
+    await copyPromptToClipboard(prompt, status, "提示詞已複製 — 貼到 Claude App（或其他生成式AI）拿建議，再把回覆直接貼進上面的欄位（會自動存檔）。");
+  });
+}
+async function renderItem({ id, subject, tagInfo, srcLabel, srcClass, metaLine, reason, extraHtml, vip, showPrep, resched, showTransit, editEvent, showCompletionDate }){
+  const state = await getState(id);
+  const wrap = document.createElement("div");
+  wrap.className = `item ${tagInfo.tier}${state.done ? " done" : ""}${vip ? " vip" : ""}`;
+  const prepHtml = showPrep ? prepBoxHtml(id, state.prep) : "";
+  const transitState = showTransit ? await getTransitState(id) : null;
+  const transitHtml = transitState ? transitBoxHtml(id, transitState) : "";
+  const editHtml = editEvent ? eventEditToggleHtml(id) + eventEditBoxHtml(editEvent) : "";
+  const completionHtml = showCompletionDate ? `<div class="completion-date-row">
+      <label>完成日期</label>
+      <input type="date" data-completion-date="${id}" value="${state.completedDate || ""}">
+    </div>` : "";
+  const reschedTag = resched ? `<span class="item-tag tag-soon">待重新安排</span>` : "";
+  wrap.innerHTML = `
+    <label class="item-check"><input type="checkbox" ${state.done ? "checked" : ""}/></label>
+    <div class="item-body">
+      <div class="item-top">
+        <div class="item-subject">${subject}</div>
+        <div class="item-tags">${vip ? '<span class="item-tag tag-vip">★ VIP</span>' : ""}${reschedTag}<span class="item-tag ${tagInfo.tag}">${tagInfo.label}</span></div>
+      </div>
+      <div class="item-meta">${srcLabel ? `<span class="item-src ${srcClass}">${srcLabel}</span>` : ""}${metaLine}</div>
+      ${reason ? `<div class="item-reason">${reason}</div>` : ""}
+      ${extraHtml || ""}
+      ${transitHtml}
+      ${prepHtml}
+      ${editHtml}
+      ${completionHtml}
+      <div class="item-note-label">加註記</div>
+      <textarea class="item-note" placeholder="輸入處理狀態或備註…">${state.note || ""}</textarea>
+    </div>`;
+  wrap.querySelector("input[type=checkbox]").addEventListener("change", async (e) => {
+    const s = await getState(id); s.done = e.target.checked;
+    if(showCompletionDate && e.target.checked && !s.completedDate){
+      const today = new Date();
+      s.completedDate = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}-${String(today.getDate()).padStart(2,"0")}`;
+      const dateInput = wrap.querySelector(`[data-completion-date="${id}"]`);
+      if(dateInput) dateInput.value = s.completedDate;
+    }
+    await setState(id, s);
+    wrap.classList.toggle("done", e.target.checked);
+    if(showCompletionDate) renderLabMonthSummary(); // keep the month overview live, not just on next reload
+    updateDocsBadge();
+  });
+  const note = wrap.querySelector(".item-note");
+  let nt;
+  note.addEventListener("input", () => {
+    clearTimeout(nt);
+    nt = setTimeout(async () => { const s = await getState(id); s.note = note.value; await setState(id, s); }, 400);
+  });
+  if(showPrep) wirePrepBox(wrap, id, subject, metaLine);
+  if(showTransit) await wireTransitBox(wrap, id);
+  if(editEvent) await wireEventEditToggle(wrap, id);
+  if(showCompletionDate){
+    const dateInput = wrap.querySelector(`[data-completion-date="${id}"]`);
+    if(dateInput) dateInput.addEventListener("change", async (e) => {
+      const s = await getState(id); s.completedDate = e.target.value; await setState(id, s);
+      renderLabMonthSummary();
+    });
+  }
+  return wrap;
+}
+
+/* ================= decision cards (opening briefing) ================= */
+async function computeConflicts(){
+  const calEvents = await getAllCalEvents();
+  const all = [...calEvents, ...TEACHING_EVENTS];
+  const byDay = {};
+  all.forEach(e => { (byDay[e.offset] = byDay[e.offset] || []).push(e); });
+  const pairs = [];
+  Object.values(byDay).forEach(list => {
+    if(list.length > 1){
+      for(let i=0;i<list.length-1;i++) pairs.push([list[i], list[i+1]]);
+    }
+  });
+  return pairs;
+}
+async function renderDecisionCards(){
+  const box = document.getElementById("decisionCards");
+  box.innerHTML = "";
+  let count = 0;
+
+  // 1) conflicts
+  const pairs = await computeConflicts();
+  for(const [a,b] of pairs){
+    const sa = await getState(a.id), sb = await getState(b.id);
+    if(sa.resolution || sb.resolution) continue; // already resolved
+    count++;
+    const card = document.createElement("div");
+    card.className = "decision-card";
+    card.innerHTML = `<div class="dc-text">${a.time.split("–")[0]}「${a.subject}」與 ${b.time.split("–")[0]}「${b.subject}」時間重疊。</div>
+      <div class="dc-btns">
+        <button class="dc-btn primary" data-keep="a">保留「${a.subject}」</button>
+        <button class="dc-btn primary" data-keep="b">保留「${b.subject}」</button>
+        <button class="dc-btn" data-keep="later">晚點決定</button>
+      </div>`;
+    card.querySelector('[data-keep="a"]').addEventListener("click", async () => {
+      const sa2 = await getState(a.id); sa2.resolution="kept"; await setState(a.id, sa2);
+      const sb2 = await getState(b.id); sb2.resolution="reschedule"; await setState(b.id, sb2);
+      showToast("已更新", `保留「${a.subject}」，「${b.subject}」標記為待重新安排。`);
+      refreshAll();
+    });
+    card.querySelector('[data-keep="b"]').addEventListener("click", async () => {
+      const sb2 = await getState(b.id); sb2.resolution="kept"; await setState(b.id, sb2);
+      const sa2 = await getState(a.id); sa2.resolution="reschedule"; await setState(a.id, sa2);
+      showToast("已更新", `保留「${b.subject}」，「${a.subject}」標記為待重新安排。`);
+      refreshAll();
+    });
+    card.querySelector('[data-keep="later"]').addEventListener("click", () => card.remove());
+    box.appendChild(card);
+  }
+
+  // 2) overdue tracked docs
+  const tracked = await getTracked();
+  for(const t of tracked){
+    if(t.offset === null || t.offset >= 0) continue;
+    const st = await getState(t.id);
+    if(st.done) continue;
+    count++;
+    const card = document.createElement("div");
+    card.className = "decision-card";
+    card.innerHTML = `<div class="dc-text">「${t.subject}」已超過期限 ${Math.abs(t.offset)} 天。</div>
+      <div class="dc-btns">
+        <button class="dc-btn primary" data-act="view">查看草稿回覆</button>
+        <button class="dc-btn" data-act="done">標記已處理</button>
+        <button class="dc-btn" data-act="delay">延後 3 天再提醒</button>
+      </div>`;
+    card.querySelector('[data-act="view"]').addEventListener("click", () => switchPanel("docs"));
+    card.querySelector('[data-act="done"]').addEventListener("click", async () => {
+      const s = await getState(t.id); s.done = true; await setState(t.id, s);
+      showToast("已標記完成", `「${t.subject}」已標記為已處理。`);
+      refreshAll();
+    });
+    card.querySelector('[data-act="delay"]').addEventListener("click", async () => {
+      const cur = await getTracked();
+      const idx = cur.findIndex(x => x.id === t.id);
+      if(idx >= 0){ cur[idx].offset = (cur[idx].offset || 0) + 3; await setTracked(cur); }
+      showToast("已延後", `「${t.subject}」延後 3 天再提醒。`);
+      refreshAll();
+    });
+    box.appendChild(card);
+  }
+
+  // 3) unscheduled lab treatments (cap at 2, gentle nudge only)
+  const groups = await getLabGroups();
+  let shown = 0;
+  for(const g of groups){
+    for(const t of g.treatments){
+      if(shown >= 2) break;
+      const st = await getState(t.id);
+      if(st.done) continue;
+      shown++; count++;
+      const card = document.createElement("div");
+      card.className = "decision-card";
+      card.innerHTML = `<div class="dc-text">「${t.text}」還沒排時間。</div>
+        <div class="dc-btns">
+          <button class="dc-btn primary" data-act="goto">去實驗頁安排</button>
+          <button class="dc-btn" data-act="dismiss">先不管</button>
+        </div>`;
+      card.querySelector('[data-act="goto"]').addEventListener("click", () => switchPanel("lab"));
+      card.querySelector('[data-act="dismiss"]').addEventListener("click", () => card.remove());
+      box.appendChild(card);
+    }
+  }
+
+  document.getElementById("briefingUpdated").textContent = count > 0
+    ? `${count} 件需要留意` : "目前沒有需要留意的事";
+}
+
+function setGreeting(){
+  const h = new Date().getHours();
+  const g = h < 5 ? "夜深了" : h < 12 ? "早安" : h < 18 ? "午安" : "晚安";
+  document.getElementById("greetingText").textContent = g;
+  document.getElementById("greetingSub").textContent = "以下是今天的重點";
+}
+
+/* ================= daily panel ================= */
+async function renderDaily(){
+  const homeCity = await getHomeCity();
+  const vipRaw = await getVipList();
+  const tracked = await getTracked();
+  const calEvents = await getAllCalEvents();
+
+  const overdueTracked = tracked.filter(t => t.offset !== null && t.offset < 0).length;
+  document.getElementById("scanbar").innerHTML = [
+    [calEvents.length + TEACHING_EVENTS.length, "筆行事曆項目"],
+    [tracked.length, "件追蹤中"],
+    [overdueTracked, "件已逾期", overdueTracked>0]
+  ].map(s => `<div class="scanstat"><div class="num${s[2]?' overdue':''}">${s[0]}</div><div class="lbl">${s[1]}</div></div>`).join("");
+
+  const combined = [];
+  for(const ev of calEvents){
+    const st = await getState(ev.id);
+    const vip = isVip(ev.contact, vipRaw);
+    const teachMail = ev.isTeachingInvite ? mailReminderLink("邀課提醒：" + ev.subject, `${ev.subject}\n${ev.time} · ${ev.location}`, "寄提醒信給自己（記得帶素材去 Claude 用技能包）") : "";
+    combined.push({ id:ev.id, subject:ev.subject, offset:ev.offset, vip, showPrep: !!ev.needsPrep, resched: st.resolution==="reschedule",
+      metaLine:`${ev.time} · ${ev.location} · ${ev.calendar}`, srcLabel: ev.isTeachingInvite ? "邀課" : "行事曆", srcClass: ev.isTeachingInvite ? "doc" : "cal",
+      reason: ev.offset<=1 ? "近期行程，建議確認是否需要提前準備。" : "行程已排定。",
+      extraHtml: thsrChip(ev.location, homeCity) + teachMail, showTransit: isTransitEvent(ev.location, homeCity),
+      editEvent: ev.isCustom ? ev : null });
+  }
+  for(const t of TEACHING_EVENTS){
+    const st = await getState(t.id);
+    const vip = isVip(t.sender, vipRaw);
+    const mailBody = `${t.subject}\n${t.time} · ${t.location} · ${t.sender}\n\n${t.reason}`;
+    combined.push({ id:t.id, subject:t.subject, offset:t.offset, vip, showPrep: t.offset<=1, resched: st.resolution==="reschedule",
+      metaLine:`${t.time} · ${t.location} · ${t.sender}`, srcLabel:"邀課", srcClass:"doc",
+      reason:t.reason, extraHtml: thsrChip(t.location, homeCity) + mailReminderLink("邀課提醒：" + t.subject, mailBody, "寄提醒信給自己（記得帶素材去 Claude 用技能包）"),
+      showTransit: isTransitEvent(t.location, homeCity) });
+  }
+  for(const d of tracked){
+    const st = await getState(d.id);
+    if(st.done) continue;
+    combined.push({ id:d.id, subject:d.subject, offset:d.offset, vip:false, showPrep:false, resched:false,
+      metaLine: d.kind === "action" ? `會議行動項目 · 負責人：${d.owner || "未指定"}` : "公文追蹤",
+      srcLabel: d.kind === "action" ? "行動項目" : "公文", srcClass: d.kind === "action" ? "action" : "doc",
+      reason:d.summary || "", extraHtml:"" });
+  }
+  const groups = await getLabGroups();
+  for(const g of groups){
+    for(const t of g.treatments){
+      const st = await getState(t.id);
+      if(st.done) continue;
+      combined.push({ id:t.id, subject:t.text, offset:null, vip:false, showPrep:false, resched:false,
+        metaLine: g.purpose ? `實驗待辦 · ${g.purpose}` : "實驗待辦", srcLabel:"實驗", srcClass:"action",
+        reason: g.control ? `對照組：${g.control}` : "待安排時間執行的實驗條件。", extraHtml:"" });
+    }
+  }
+  combined.sort((a,b) => effectiveTier(a.offset, a.vip) - effectiveTier(b.offset, b.vip));
+
+  const briefing = document.getElementById("briefingList");
+  const briefingNodes = [];
+  for(const c of combined){
+    try {
+      briefingNodes.push(await renderItem({ id:c.id, subject:c.subject, tagInfo:urgencyOf(c.offset),
+        srcLabel:c.srcLabel, srcClass:c.srcClass, metaLine:c.metaLine, reason:c.reason, extraHtml:c.extraHtml,
+        vip:c.vip, showPrep:c.showPrep, resched:c.resched, showTransit:c.showTransit, editEvent:c.editEvent }));
+    } catch(err){ console.error("briefing item failed:", c.id, err); }
+  }
+  briefing.innerHTML = "";
+  if(briefingNodes.length === 0){ briefing.innerHTML = `<div class="empty">目前沒有需要處理的項目。</div>`; }
+  else { briefingNodes.forEach(n => briefing.appendChild(n)); }
+
+  const calList = document.getElementById("calendarList");
+  const calNodes = [];
+  for(const ev of calEvents){
+    try {
+      const st = await getState(ev.id);
+      const vip = isVip(ev.contact, vipRaw);
+      const teachMail = ev.isTeachingInvite ? mailReminderLink("邀課提醒：" + ev.subject, `${ev.subject}\n${ev.time} · ${ev.location}`, "寄提醒信給自己（記得帶素材去 Claude 用技能包）") : "";
+      calNodes.push(await renderItem({ id:ev.id, subject:ev.subject, tagInfo:urgencyOf(ev.offset),
+        srcLabel: ev.isTeachingInvite ? "邀課" : "行事曆", srcClass: ev.isTeachingInvite ? "doc" : "cal", metaLine:`${ev.time} · ${ev.location} · ${ev.calendar}`,
+        reason: ev.offset<=1 ? "近期行程，建議確認是否需要提前準備。" : "行程已排定。",
+        extraHtml: thsrChip(ev.location, homeCity) + teachMail, vip, showPrep: !!ev.needsPrep, resched: st.resolution==="reschedule",
+        showTransit: isTransitEvent(ev.location, homeCity), editEvent: ev.isCustom ? ev : null }));
+    } catch(err){ console.error("calendar item failed:", ev.id, err); }
+  }
+  // Only clear the list once the new content is fully built — so a mid-loop
+  // failure (whatever the cause) can't leave the list cleared-but-empty.
+  calList.innerHTML = "";
+  calNodes.forEach(n => calList.appendChild(n));
+  if(calNodes.length === 0 && calEvents.length > 0){
+    calList.innerHTML = `<div class="empty">行事曆項目載入時發生問題，資料仍在——請重新整理或回報這個狀況。</div>`;
+  }
+
+  const teachList = document.getElementById("teachingList");
+  teachList.innerHTML = "";
+  // Include both the (currently empty) demo TEACHING_EVENTS array and any
+  // real calendar entries flagged "這是邀課邀請" — this section was
+  // previously wired to TEACHING_EVENTS only, so marking a calendar event as
+  // a teaching invite never actually surfaced it here. Fixed.
+  const calTeachEvents = calEvents.filter(ev => ev.isTeachingInvite);
+  const allTeach = [...TEACHING_EVENTS, ...calTeachEvents];
+  if(allTeach.length === 0){ teachList.innerHTML = `<div class="empty">本次掃描未發現邀課信件。</div>`; }
+  for(const t of TEACHING_EVENTS){
+    const vip = isVip(t.sender, vipRaw);
+    const mailBody = `${t.subject}\n${t.time} · ${t.location} · ${t.sender}\n\n${t.reason}`;
+    teachList.appendChild(await renderItem({ id:t.id, subject:t.subject, tagInfo:urgencyOf(t.offset),
+      srcLabel:"邀課", srcClass:"doc", metaLine:`${t.time} · ${t.location} · ${t.sender}`,
+      reason:t.reason, extraHtml: thsrChip(t.location, homeCity) + mailReminderLink("邀課提醒：" + t.subject, mailBody, "寄提醒信給自己（記得帶素材去 Claude 用技能包）"), vip, showPrep: t.offset<=1,
+      showTransit: isTransitEvent(t.location, homeCity) }));
+  }
+  for(const ev of calTeachEvents){
+    const st = await getState(ev.id);
+    const vip = isVip(ev.contact, vipRaw);
+    const mailBody = `${ev.subject}\n${ev.time} · ${ev.location}`;
+    teachList.appendChild(await renderItem({ id:ev.id, subject:ev.subject, tagInfo:urgencyOf(ev.offset),
+      srcLabel:"邀課", srcClass:"doc", metaLine:`${ev.time} · ${ev.location} · ${ev.calendar}`,
+      reason: ev.offset<=1 ? "近期行程，建議確認是否需要提前準備。" : "行程已排定。",
+      extraHtml: thsrChip(ev.location, homeCity) + mailReminderLink("邀課提醒：" + ev.subject, mailBody, "寄提醒信給自己（記得帶素材去 Claude 用技能包）"),
+      vip, showPrep: !!ev.needsPrep, resched: st.resolution==="reschedule",
+      showTransit: isTransitEvent(ev.location, homeCity), editEvent: ev.isCustom ? ev : null }));
+  }
+}
+
+/* ================= weekly panel (vertical) ================= */
+let gridViewDate = new Date(); gridViewDate.setDate(1); gridViewDate.setHours(0,0,0,0);
+async function renderCalGrid(){
+  const label = document.getElementById("gridMonthLabel");
+  const grid = document.getElementById("calGrid");
+  const y = gridViewDate.getFullYear(), m = gridViewDate.getMonth();
+  label.textContent = `${y} 年 ${m+1} 月`;
+
+  const calEvents = await getAllCalEvents();
+  const all = [...calEvents, ...TEACHING_EVENTS];
+  const offsetCounts = {};
+  all.forEach(e => { offsetCounts[e.offset] = (offsetCounts[e.offset] || 0) + 1; });
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  const firstOfMonth = new Date(y, m, 1);
+  const startDow = firstOfMonth.getDay();
+  const daysInMonth = new Date(y, m+1, 0).getDate();
+
+  let html = ["日","一","二","三","四","五","六"].map(d => `<div class="cg-dow">${d}</div>`).join("");
+  for(let i=0;i<startDow;i++) html += `<div class="cal-cell blank"></div>`;
+  for(let d=1; d<=daysInMonth; d++){
+    const cellDate = new Date(y, m, d); cellDate.setHours(0,0,0,0);
+    const offset = Math.round((cellDate - today) / 86400000);
+    const isToday = offset === 0;
+    const count = offsetCounts[offset] || 0;
+    html += `<div class="cal-cell${isToday?' today':''}${count>0?' has-events':''}" data-cell-offset="${offset}">
+      <span>${d}</span>
+      ${count>0 ? `<span class="cg-dot"></span>` : ""}
+      ${count>1 ? `<span class="cg-count">${count}</span>` : ""}
+    </div>`;
+  }
+  grid.innerHTML = html;
+  grid.querySelectorAll(".cal-cell.has-events").forEach(cell => {
+    cell.addEventListener("click", () => {
+      const offset = cell.getAttribute("data-cell-offset");
+      const target = document.querySelector(`[data-day-offset="${offset}"]`);
+      if(target){
+        target.scrollIntoView({ behavior:"smooth", block:"center" });
+        target.classList.add("flash");
+        setTimeout(() => target.classList.remove("flash"), 1200);
+      }
+    });
+  });
+}
+function setupCalGridNav(){
+  document.getElementById("gridPrevBtn").addEventListener("click", () => { gridViewDate.setMonth(gridViewDate.getMonth()-1); renderCalGrid(); });
+  document.getElementById("gridNextBtn").addEventListener("click", () => { gridViewDate.setMonth(gridViewDate.getMonth()+1); renderCalGrid(); });
+}
+async function renderWeekly(){
+  await renderCalGrid();
+  const vipRaw = await getVipList();
+  const tracked = await getTracked();
+  const homeCity = await getHomeCity();
+  const calEvents = await getAllCalEvents();
+  const all = [...calEvents, ...TEACHING_EVENTS];
+
+  const byDay = {};
+  all.forEach(e => { (byDay[e.offset] = byDay[e.offset] || []).push(e); });
+  const conflictIds = new Set();
+  Object.values(byDay).forEach(list => { if(list.length > 1) list.forEach(e => conflictIds.add(e.id)); });
+
+  const overdueTracked = tracked.filter(t => t.offset !== null && t.offset < 0).length;
+  document.getElementById("weekScanbar").innerHTML = [
+    [all.length + tracked.length, "本月項目"],
+    [conflictIds.size, "筆衝突", conflictIds.size>0],
+    [overdueTracked, "件已逾期", overdueTracked>0]
+  ].map(s => `<div class="scanstat"><div class="num${s[2]?' overdue':''}">${s[0]}</div><div class="lbl">${s[1]}</div></div>`).join("");
+
+  const wrap = document.getElementById("weekDayList");
+  const dayBlocks = [];
+  const today = new Date(); today.setHours(0,0,0,0);
+  for(let offset=0; offset<=29; offset++){
+    try {
+      const d = new Date(today); d.setDate(d.getDate()+offset);
+      const w = ["日","一","二","三","四","五","六"][d.getDay()];
+      const dayEvents = all.filter(e => e.offset === offset);
+      const dayTracked = tracked.filter(t => t.offset === offset);
+      if(dayEvents.length === 0 && dayTracked.length === 0 && offset !== 0) continue; // month view: skip empty days except today
+      const block = document.createElement("div");
+      block.className = "day-block";
+      block.setAttribute("data-day-offset", offset);
+      const head = document.createElement("div");
+      head.className = "day-head" + (offset===0 ? " today" : "");
+      head.innerHTML = `<span class="d-dot"></span><span class="d-label">${d.getMonth()+1}/${d.getDate()}（${w}）${offset===0?"・今天":""}</span>`;
+      block.appendChild(head);
+      if(dayEvents.length === 0 && dayTracked.length === 0){
+        const line = document.createElement("div");
+        line.className = "day-empty-line"; line.textContent = "—";
+        block.appendChild(line);
+      } else {
+        for(const ev of dayEvents){
+          const vip = isVip(ev.contact || ev.sender, vipRaw);
+          const isTeach = TEACHING_EVENTS.includes(ev) || ev.isTeachingInvite;
+          const teachMail = ev.isTeachingInvite ? mailReminderLink("邀課提醒：" + ev.subject, `${ev.subject}\n${ev.time} · ${ev.location}`, "寄提醒信給自己（記得帶素材去 Claude 用技能包）") : "";
+          const item = await renderItem({ id:ev.id, subject: ev.subject + (conflictIds.has(ev.id) ? "（時間重疊）" : ""),
+            tagInfo:urgencyOf(ev.offset), srcLabel: isTeach ? "邀課" : "行事曆", srcClass: isTeach ? "doc" : "cal",
+            metaLine:`${ev.time} · ${ev.location}`, reason:"", extraHtml: thsrChip(ev.location, homeCity) + teachMail, vip, showPrep:false,
+            showTransit: isTransitEvent(ev.location, homeCity), editEvent: ev.isCustom ? ev : null });
+          if(conflictIds.has(ev.id)) item.style.borderLeftColor = "var(--urgent)";
+          block.appendChild(item);
+        }
+        for(const t of dayTracked){
+          block.appendChild(await renderItem({ id:t.id, subject:t.subject, tagInfo:urgencyOf(t.offset),
+            srcLabel: t.kind === "action" ? "行動項目" : "公文", srcClass: t.kind === "action" ? "action" : "doc",
+            metaLine: t.kind === "action" ? `負責人：${t.owner || "未指定"}` : "公文追蹤", reason:t.summary || "", vip:false, showPrep:false }));
+        }
+      }
+      dayBlocks.push(block);
+    } catch(err){ console.error("day block failed:", offset, err); }
+  }
+  wrap.innerHTML = "";
+  dayBlocks.forEach(b => wrap.appendChild(b));
+}
+
+/* ================= docs panel ================= */
+function buildDocPrompt(text, signature){
+  const sigLine = signature && signature.trim()
+    ? `草稿結尾請直接使用以下固定用語／簽名（不要再另外留白讓我簽名）：\n"""\n${signature.trim()}\n"""`
+    : `結尾留白讓我自己簽名`;
+  return `你是一個公文追蹤助理。請閱讀以下公文內容，並「只」回傳一個 JSON 物件，不要有其他文字、不要用 markdown code fence包住，格式如下：
+{"subject":"公文主旨（15字內）","urgencyOffset":數字或null,"summary":"一句話摘要（30字內）","location":"公文提到的活動/會議地點名稱（例如：高雄、台中榮總），若沒有明確地點請回傳空字串","needsPrep":布林值true或false（此公文是否要求你在會前準備資料、簡報、報告、意見彙整、投影片等——只要文中有「請提供」「敬請準備」「彙整意見」「準備簡報/報告」這類要求即為true）,"draftReply":"正式禮貌的中文公文回覆草稿，控制在150字以內，簡潔扼要。${sigLine}"}
+務必輸出完整、合法、可以被解析的 JSON——寧可內容精簡一點，也不要讓 JSON 被截斷。
+公文內容如下：
+---
+${text}
+---`;
+}
+function buildMeetingPrompt(text){
+  return `你是一個會議記錄助理。請閱讀以下會議記錄，找出所有行動項目，只回傳一個 JSON 物件，不要其他文字、不要 markdown code fence：
+{"meetingSubject":"會議主旨（15字內）","summary":"一句話摘要（30字內）","actionItems":[{"task":"待辦內容（20字內）","owner":"負責人或未指定","urgencyOffset":數字或null}]}
+若無明確行動項目，actionItems回傳[]；最多列出 8 項最重要的行動項目即可，不用鉅細靡遺。
+務必輸出完整、合法、可以被解析的 JSON——寧可內容精簡一點，也不要讓 JSON 被截斷。
+會議記錄如下：
+---
+${text}
+---`;
+}
+function docEditToggleHtml(id){
+  return `<div class="row" style="margin-top:8px;"><span class="mini-btn" style="display:inline-flex;align-items:center;gap:5px;" data-doc-edit-toggle="${id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>編輯此筆公文</span></div>`;
+}
+function docEditBoxHtml(d){
+  return `<div class="edit-box" data-doc-editbox="${d.id}" style="display:none;">
+    <input type="text" data-doc-f="subject" value="${(d.subject||"").replace(/"/g,'&quot;')}" placeholder="主旨">
+    <input type="text" data-doc-f="location" value="${(d.location||"").replace(/"/g,'&quot;')}" placeholder="地點（選填，留空則不顯示高鐵/交通核銷提醒）" style="margin-top:8px;">
+    <textarea data-doc-f="summary" placeholder="摘要／補充說明" style="margin-top:8px;min-height:60px;">${d.summary||""}</textarea>
+    <label style="display:flex;align-items:center;gap:7px;margin-top:10px;font-size:13px;cursor:pointer;">
+      <input type="checkbox" data-doc-f="prep" ${d.needsPrep?"checked":""} style="width:18px;height:18px;accent-color:var(--mark-c);"> 需要準備資料或簡報
+    </label>
+    <div class="row"><button class="btn secondary" data-doc-save="${d.id}">儲存修改</button></div>
+  </div>`;
+}
+function wireDocEditToggle(container, d){
+  const toggle = container.querySelector(`[data-doc-edit-toggle="${d.id}"]`);
+  const box = container.querySelector(`[data-doc-editbox="${d.id}"]`);
+  if(!toggle || !box) return;
+  toggle.addEventListener("click", () => { box.style.display = box.style.display === "none" ? "block" : "none"; });
+  box.querySelector(`[data-doc-save="${d.id}"]`).addEventListener("click", async () => {
+    try {
+      const cur = await getTracked();
+      const idx = cur.findIndex(x => x.id === d.id);
+      if(idx >= 0){
+        const subjectVal = box.querySelector('[data-doc-f="subject"]').value.trim();
+        cur[idx].subject = subjectVal || cur[idx].subject;
+        cur[idx].location = box.querySelector('[data-doc-f="location"]').value.trim();
+        cur[idx].summary = box.querySelector('[data-doc-f="summary"]').value.trim();
+        cur[idx].needsPrep = box.querySelector('[data-doc-f="prep"]').checked;
+        await setTracked(cur);
+        showToast("已更新", `「${cur[idx].subject}」的異動已儲存。`);
+      }
+      await refreshAll();
+    } catch(err){ showDebugError("編輯公文儲存", err); }
+  });
+}
+async function renderDocList(){
+  const tracked = await getTracked();
+  const wrap = document.getElementById("docList");
+  wrap.innerHTML = "";
+  if(tracked.length === 0){ wrap.innerHTML = `<div class="empty">尚未追蹤任何公文或行動項目。</div>`; return; }
+  const homeCity = await getHomeCity();
+
+  const searchInput = document.getElementById("docSearchInput");
+  const urgencySelect = document.getElementById("docFilterUrgency");
+  const searchText = (searchInput ? searchInput.value : "").trim().toLowerCase();
+  const urgencyFilter = urgencySelect ? urgencySelect.value : "";
+  const filtered = tracked.filter(d => {
+    if(urgencyFilter && urgencyOf(d.offset).tier !== urgencyFilter) return false;
+    if(searchText){
+      const haystack = [d.subject, d.summary, d.owner, d.sourceMeeting].filter(Boolean).join(" ").toLowerCase();
+      if(!haystack.includes(searchText)) return false;
+    }
+    return true;
+  });
+  if(filtered.length === 0){ wrap.innerHTML = `<div class="empty">沒有符合搜尋／篩選條件的項目。</div>`; return; }
+
+  const docItems = filtered.filter(d => d.kind !== "action");
+  const actionItems = filtered.filter(d => d.kind === "action");
+
+  // Action items that share a meetingSubject/groupId are grouped into one
+  // card (one meeting = one block), with each owner's task as its own
+  // checkable sub-row inside it, instead of one flat card per task. Items
+  // saved before this grouping existed have no groupId — fall back to their
+  // own id so they still render (as a one-item group) instead of breaking.
+  const groupsMap = new Map();
+  for(const a of actionItems){
+    const gid = a.groupId || a.id;
+    if(!groupsMap.has(gid)) groupsMap.set(gid, []);
+    groupsMap.get(gid).push(a);
+  }
+  const groupEarliestOffset = (items) => {
+    const offsets = items.map(i => i.offset).filter(o => typeof o === "number");
+    return offsets.length ? Math.min(...offsets) : null;
+  };
+  const groupEntries = [...groupsMap.entries()].map(([gid, items]) => ({ groupId:gid, items, offset:groupEarliestOffset(items) }));
+  groupEntries.sort((a,b) => TIER_ORDER[urgencyOf(a.offset).tier]-TIER_ORDER[urgencyOf(b.offset).tier]);
+  const sortedDocItems = [...docItems].sort((a,b) => TIER_ORDER[urgencyOf(a.offset).tier]-TIER_ORDER[urgencyOf(b.offset).tier]);
+
+  // 公文 and 會議記錄 render as two separate sections (not interleaved by
+  // urgency) — mixing them together made it hard to scan either list on its
+  // own, per explicit feedback.
+  if(sortedDocItems.length > 0){
+    const docHeader = document.createElement("div");
+    docHeader.className = "list-section-header";
+    docHeader.textContent = "公文";
+    wrap.appendChild(docHeader);
+    for(const d of sortedDocItems){
+      const dState = await getState(d.id);
+      const todayStr0 = (() => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}-${String(t.getDate()).padStart(2,"0")}`; })();
+      const extraHtml = `<div class="draft-box"><div class="lbl"><span>草擬回覆</span><span style="cursor:pointer;text-decoration:underline;" data-delete="${d.id}">刪除</span></div><textarea data-draft="${d.id}">${d.draftReply || ""}</textarea>
+        <div class="sent-row"><label><input type="checkbox" data-sent="${d.id}" ${dState.sent ? "checked" : ""}> 已送出</label><input type="date" data-sent-date="${d.id}" value="${dState.sentDate || (dState.sent ? todayStr0 : "")}" style="${dState.sent ? "" : "display:none;"}"></div>
+      </div>
+      ${docEditToggleHtml(d.id)}
+      ${docEditBoxHtml(d)}`;
+      const dHomeExtra = thsrChip(d.location, homeCity);
+      const card = await renderItem({ id:d.id, subject:d.subject, tagInfo:urgencyOf(d.offset),
+        srcLabel: "公文", srcClass: "doc", metaLine: d.location ? `人工上傳 · 地點：${d.location}` : "人工上傳",
+        reason:d.summary, extraHtml: dHomeExtra + extraHtml, vip:false, showPrep: !!d.needsPrep,
+        showTransit: isTransitEvent(d.location, homeCity) });
+      wireDocEditToggle(card, d);
+      card.querySelector(`[data-delete="${d.id}"]`).addEventListener("click", async () => {
+        const cur = await getTracked(); await setTracked(cur.filter(x => x.id !== d.id));
+        showToast("已刪除", `「${d.subject}」已從追蹤清單移除。`);
+        refreshAll();
+      });
+      const sentCheckbox = card.querySelector(`[data-sent="${d.id}"]`);
+      const sentDateInput = card.querySelector(`[data-sent-date="${d.id}"]`);
+      sentCheckbox.addEventListener("change", async () => {
+        const s = await getState(d.id);
+        s.sent = sentCheckbox.checked;
+        if(sentCheckbox.checked && !s.sentDate){ s.sentDate = todayStr0; sentDateInput.value = todayStr0; }
+        sentDateInput.style.display = sentCheckbox.checked ? "" : "none";
+        await setState(d.id, s);
+      });
+      sentDateInput.addEventListener("change", async () => {
+        const s = await getState(d.id); s.sentDate = sentDateInput.value; await setState(d.id, s);
+      });
+      const draftArea = card.querySelector(`[data-draft="${d.id}"]`);
+      let dt;
+      draftArea.addEventListener("input", () => {
+        clearTimeout(dt);
+        dt = setTimeout(async () => {
+          const cur = await getTracked(); const idx = cur.findIndex(x => x.id === d.id);
+          if(idx >= 0){ cur[idx].draftReply = draftArea.value; await setTracked(cur); }
+        }, 400);
+      });
+      wrap.appendChild(card);
+    }
+  }
+
+  if(groupEntries.length > 0){
+    const meetingHeader = document.createElement("div");
+    meetingHeader.className = "list-section-header";
+    meetingHeader.textContent = "會議記錄／行動項目";
+    wrap.appendChild(meetingHeader);
+    for(const entry of groupEntries){
+      const items = entry.items;
+      const groupTag = urgencyOf(entry.offset);
+      const groupEl = document.createElement("div");
+      groupEl.className = "meeting-group";
+      groupEl.innerHTML = `<div class="meeting-group-header">
+          <div class="meeting-group-title">${items[0].sourceMeeting || "會議行動項目"}</div>
+          <div class="item-tags"><span class="item-tag ${groupTag.tag}">${groupTag.label}</span></div>
+        </div>
+        ${items[0].summary ? `<div class="meeting-group-summary">${items[0].summary}</div>` : ""}
+        <div class="row" style="margin:2px 0 6px;"><button class="btn secondary" data-workflow-btn="${entry.groupId}" style="font-size:12px;padding:7px 12px;min-height:34px;">此會議需要建立單位流程？複製提示詞</button></div>
+        <div class="status-line" data-workflow-status="${entry.groupId}"></div>
+        <div class="meeting-group-del" data-delete-group="${entry.groupId}">刪除整組</div>`;
+      groupEl.querySelector(`[data-delete-group]`).addEventListener("click", async () => {
+        const cur = await getTracked(); await setTracked(cur.filter(x => x.groupId !== entry.groupId && x.id !== entry.groupId));
+        showToast("已刪除", `「${items[0].sourceMeeting || "會議行動項目"}」整組已移除。`);
+        refreshAll();
+      });
+      groupEl.querySelector(`[data-workflow-btn]`).addEventListener("click", async () => {
+        const status = groupEl.querySelector(`[data-workflow-status="${entry.groupId}"]`);
+        const prompt = buildWorkflowPrompt(items[0].sourceMeeting || "會議行動項目", items[0].summary || "", items);
+        await copyPromptToClipboard(prompt, status, "提示詞已複製 — 貼到 Claude App（或其他生成式AI），拿到單位流程草稿後回來這裡跟我對話，我可以幫你存成教學手冊或技能包。");
+      });
+      for(const it of items){
+        const itemCard = await renderItem({ id:it.id, subject:it.task_display || it.subject, tagInfo:urgencyOf(it.offset),
+          srcLabel: null, srcClass: "action", metaLine: `負責人：${it.owner||"未指定"}`,
+          reason:"", extraHtml: `<div class="item-meta" style="margin-top:4px;"><span style="cursor:pointer;text-decoration:underline;" data-delete="${it.id}">刪除此筆</span></div>`,
+          vip:false, showPrep:false });
+        itemCard.querySelector(`[data-delete="${it.id}"]`).addEventListener("click", async () => {
+          const cur = await getTracked(); await setTracked(cur.filter(x => x.id !== it.id));
+          showToast("已刪除", `「${it.task || it.subject}」已移除。`);
+          refreshAll();
+        });
+        groupEl.appendChild(itemCard);
+      }
+      wrap.appendChild(groupEl);
+    }
+  }
+}
+function setupDocUpload(){
+  document.getElementById("docFile").addEventListener("change", (e) => {
+    const file = e.target.files[0]; if(!file) return;
+    const reader = new FileReader();
+    reader.onload = () => { document.getElementById("docInput").value = reader.result; };
+    reader.readAsText(file);
+  });
+  let dst;
+  document.getElementById("docSearchInput").addEventListener("input", () => {
+    clearTimeout(dst); dst = setTimeout(() => renderDocList(), 250);
+  });
+  document.getElementById("docFilterUrgency").addEventListener("change", () => renderDocList());
+  document.getElementById("clearBtn").addEventListener("click", () => {
+    document.getElementById("docInput").value = ""; document.getElementById("docStatus").textContent = "";
+    document.getElementById("aiReplyInput").value = ""; document.getElementById("aiReplyStatus").textContent = "";
+  });
+  document.getElementById("mailReminderBtn").addEventListener("click", async () => {
+    const text = document.getElementById("docInput").value.trim();
+    const type = document.querySelector('input[name="docType"]:checked').value;
+    const status = document.getElementById("docStatus");
+    if(!text){ status.className = "status-line err"; status.textContent = "請先貼上內容再寄提醒信。"; return; }
+    const today = new Date();
+    const subject = (type === "doc" ? "公文提醒：" : "會議記錄提醒：") + `${today.getMonth()+1}/${today.getDate()}`;
+    let copied = false;
+    try { await navigator.clipboard.writeText(`主旨：${subject}\n\n${text}`); copied = true; } catch(err){}
+    try { window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`; } catch(err){}
+    status.className = "status-line";
+    if(copied){
+      status.textContent = "內容已複製。";
+      showToast("內容已複製", "如果沒有自動跳出寄信 App，請自行打開信箱貼上（Ctrl/Cmd+V）送出。");
+    } else {
+      status.className = "status-line err";
+      status.textContent = "複製失敗，請手動選取文字複製。";
+      showToast("複製失敗", "請手動選取上面文字框的內容並複製。", 6000);
+    }
+  });
+  document.querySelectorAll('input[name="docType"]').forEach(r => r.addEventListener("change", () => {
+    const type = document.querySelector('input[name="docType"]:checked').value;
+    document.getElementById("docHint").textContent = type === "doc"
+      ? "公文：先按「複製提示詞」，貼到 Claude App（或其他生成式AI）取得回覆，再把回覆貼回下面欄位加入追蹤。"
+      : "會議記錄：先按「複製提示詞」，貼到 Claude App（或其他生成式AI）取得回覆，再把回覆貼回下面欄位擷取行動項目。";
+  }));
+  document.getElementById("copyDocPromptBtn").addEventListener("click", async () => {
+    const text = document.getElementById("docInput").value.trim();
+    const type = document.querySelector('input[name="docType"]:checked').value;
+    const status = document.getElementById("docStatus");
+    if(!text){ status.textContent = "請先貼上或上傳內容。"; status.className = "status-line err"; return; }
+    const prompt = type === "doc" ? buildDocPrompt(text, await getReplySignature()) : buildMeetingPrompt(text);
+    await copyPromptToClipboard(prompt, status);
+  });
+  document.getElementById("parseReplyBtn").addEventListener("click", async () => {
+    const type = document.querySelector('input[name="docType"]:checked').value;
+    const status = document.getElementById("aiReplyStatus");
+    const replyInput = document.getElementById("aiReplyInput");
+    try {
+      const result = parseAIJson(replyInput.value);
+      const tracked = await getTracked();
+      if(type === "doc"){
+        tracked.push({ id:"doc-"+Date.now(), kind:"doc", subject:result.subject||"未命名公文",
+          offset: typeof result.urgencyOffset === "number" ? result.urgencyOffset : null,
+          summary: result.summary||"", draftReply: result.draftReply||"", createdAt: Date.now(),
+          location: result.location||"", needsPrep: !!result.needsPrep });
+        status.className = "status-line"; status.textContent = "已加入公文追蹤清單。";
+        showToast("已加入追蹤", `「${result.subject||"未命名公文"}」已加入公文清單。`);
+      } else {
+        const items = result.actionItems || [];
+        if(items.length === 0){ status.className = "status-line"; status.textContent = "沒有找到明確的行動項目。"; }
+        else {
+          const groupId = "meeting-"+Date.now();
+          items.forEach((it, idx) => {
+            tracked.push({ id:"action-"+Date.now()+"-"+idx, kind:"action", subject:it.task||"未命名待辦",
+              offset: typeof it.urgencyOffset === "number" ? it.urgencyOffset : null,
+              summary: result.summary||"", owner: it.owner||"未指定", sourceMeeting: result.meetingSubject||"未命名會議", groupId, createdAt: Date.now() });
+          });
+          status.className = "status-line"; status.textContent = `已擷取 ${items.length} 項行動項目。`;
+          showToast("已加入追蹤", `已從「${result.meetingSubject||"未命名會議"}」擷取 ${items.length} 項行動項目。`);
+        }
+      }
+      await setTracked(tracked);
+      document.getElementById("docInput").value = "";
+      replyInput.value = "";
+      refreshAll();
+    } catch(err){
+      status.className = "status-line err";
+      status.textContent = friendlyErrorMessage(err);
+    }
+  });
+}
+
+/* ================= lab panel ================= */
+function fmtNum(n){
+  if(n===null||n===undefined||isNaN(n)) return "";
+  const abs = Math.abs(n); const digits = abs!==0 && abs<1 ? 4 : 3;
+  return (Math.round(n*Math.pow(10,digits))/Math.pow(10,digits)).toString();
+}
+function setupSingleCalc(){
+  const els = {
+    name: document.getElementById("c1Name"), c1: document.getElementById("c1Val"), c1u: document.getElementById("c1Unit"),
+    v1: document.getElementById("v1Val"), c2: document.getElementById("c2Val"), c2u: document.getElementById("c2Unit"),
+    v2: document.getElementById("v2Val"), vu: document.getElementById("volUnit"), diluent: document.getElementById("diluentName"),
+    solveFor: document.getElementById("solveFor"), result: document.getElementById("singleResult"), addBtn: document.getElementById("addSingleToNotesBtn")
+  };
+  let lastLine = "";
+  document.getElementById("calcSingleBtn").addEventListener("click", () => {
+    const target = els.solveFor.value, c1u = els.c1u.value, c2u = els.c2u.value;
+    let c1 = parseFloat(els.c1.value), v1 = parseFloat(els.v1.value), c2 = parseFloat(els.c2.value), v2 = parseFloat(els.v2.value);
+    let c1Base = isNaN(c1) ? NaN : c1*CONC_FACTORS[c1u];
+    let c2Base = isNaN(c2) ? NaN : c2*CONC_FACTORS[c2u];
+    try {
+      if(target==="v1"){ if(isNaN(c1Base)||isNaN(c2Base)||isNaN(v2)) throw 0; v1=(c2Base*v2)/c1Base; els.v1.value=fmtNum(v1); }
+      else if(target==="c2"){ if(isNaN(c1Base)||isNaN(v1)||isNaN(v2)) throw 0; c2Base=(c1Base*v1)/v2; c2=c2Base/CONC_FACTORS[c2u]; els.c2.value=fmtNum(c2); }
+      else if(target==="v2"){ if(isNaN(c1Base)||isNaN(v1)||isNaN(c2Base)) throw 0; v2=(c1Base*v1)/c2Base; els.v2.value=fmtNum(v2); }
+      else if(target==="c1"){ if(isNaN(v1)||isNaN(c2Base)||isNaN(v2)) throw 0; c1Base=(c2Base*v2)/v1; c1=c1Base/CONC_FACTORS[c1u]; els.c1.value=fmtNum(c1); }
+    } catch(e){ els.result.textContent = "請至少填滿其他三個欄位。"; els.addBtn.disabled = true; return; }
+    const diluentVol = v2 - v1;
+    const name = els.name.value.trim()||"試劑", diluent = els.diluent.value.trim()||"PBS", vu = els.vu.value.trim()||"uL";
+    if(diluentVol < 0){ els.result.textContent = `⚠ V₁ 大於 V₂，請確認數值。`; els.addBtn.disabled = true; return; }
+    lastLine = `${name}(${fmtNum(c1)}${CONC_LABELS[c1u]} stock) 取${fmtNum(v1)}${vu} + ${diluent} ${fmtNum(diluentVol)}${vu} → 得 ${fmtNum(c2)}${CONC_LABELS[c2u]}，共 ${fmtNum(v2)}${vu}`;
+    els.result.textContent = lastLine; els.addBtn.disabled = false;
+  });
+  els.addBtn.addEventListener("click", async () => {
+    if(!lastLine) return;
+    const notes = await getLabNotes();
+    notes.unshift({ id:"note-"+Date.now(), title:(els.name.value.trim()||"稀釋")+" 稀釋條件", body:lastLine });
+    await setLabNotes(notes); renderLabNoteList();
+    els.result.textContent += "\n\n✓ 已加入方法紀錄。";
+    showToast("已新增", "稀釋條件已加入方法紀錄。");
+  });
+}
+function setupSerialCalc(){
+  const els = {
+    name: document.getElementById("sdName"), c0: document.getElementById("sdC0"), cu: document.getElementById("sdCUnit"),
+    outu: document.getElementById("sdOutUnit"), factor: document.getElementById("sdFactor"), steps: document.getElementById("sdSteps"),
+    vol: document.getElementById("sdVol"), vu: document.getElementById("sdVolUnit"), diluent: document.getElementById("sdDiluent"),
+    result: document.getElementById("serialResult"), addBtn: document.getElementById("addSerialToNotesBtn")
+  };
+  let lastTableText = "";
+  document.getElementById("calcSerialBtn").addEventListener("click", () => {
+    const c0 = parseFloat(els.c0.value), factor = parseFloat(els.factor.value), steps = parseInt(els.steps.value,10), vol = parseFloat(els.vol.value);
+    const problems = [];
+    if(isNaN(c0)) problems.push("Stock 濃度");
+    if(isNaN(factor)) problems.push("稀釋倍數");
+    else if(factor<=1) problems.push("稀釋倍數（目前是 " + factor + "，須大於 1）");
+    if(isNaN(steps)) problems.push("稀釋級數");
+    else if(steps<=0) problems.push("稀釋級數（須大於 0）");
+    if(isNaN(vol)) problems.push("每管體積");
+    else if(vol<=0) problems.push("每管體積（須大於 0）");
+    if(problems.length){
+      els.result.textContent = "請檢查以下欄位：" + problems.join("、") + "（灰色提示文字不算已填寫，需要實際輸入數字）。";
+      els.addBtn.disabled = true; return;
+    }
+    const name = els.name.value.trim()||"試劑", cu = els.cu.value, outu = els.outu.value;
+    const c0Base = c0*CONC_FACTORS[cu];
+    const vu = els.vu.value.trim()||"uL", diluent = els.diluent.value.trim()||"PBS";
+    const take = vol/factor, add = vol-take;
+    let rows = [], lines = [`${name}　Stock ${fmtNum(c0)}${CONC_LABELS[cu]}　每次稀釋 ${fmtNum(factor)} 倍　每管體積 ${fmtNum(vol)}${vu}`];
+    for(let i=1;i<=steps;i++){
+      const concBase = c0Base/Math.pow(factor,i), conc = concBase/CONC_FACTORS[outu];
+      const source = i===1 ? "Stock" : `第 ${i-1} 管`;
+      rows.push(`<tr><td>第 ${i} 管</td><td>${source}</td><td>${fmtNum(take)}${vu}</td><td>${diluent} ${fmtNum(add)}${vu}</td><td>${fmtNum(conc)}${CONC_LABELS[outu]}</td></tr>`);
+      lines.push(`第${i}管：取${source} ${fmtNum(take)}${vu} + ${diluent} ${fmtNum(add)}${vu} → ${fmtNum(conc)}${CONC_LABELS[outu]}，共 ${fmtNum(vol)}${vu}`);
+    }
+    els.result.innerHTML = `<table><tr><th>管別</th><th>來源</th><th>取用</th><th>加稀釋液</th><th>濃度</th></tr>${rows.join("")}</table>`;
+    lastTableText = lines.join("\n"); els.addBtn.disabled = false;
+  });
+  els.addBtn.addEventListener("click", async () => {
+    if(!lastTableText) return;
+    const notes = await getLabNotes();
+    notes.unshift({ id:"note-"+Date.now(), title:(els.name.value.trim()||"稀釋")+" 連續稀釋", body:lastTableText });
+    await setLabNotes(notes); renderLabNoteList();
+    els.result.innerHTML += `<div style="margin-top:8px;font-family:-apple-system,sans-serif;color:var(--calm);">✓ 已加入方法紀錄。</div>`;
+    showToast("已新增", "連續稀釋條件已加入方法紀錄。");
+  });
+}
+async function renderLabMonthSummary(){
+  const groups = await getLabGroups();
+  const allTreatments = [];
+  for(const g of groups){ for(const t of g.treatments){ allTreatments.push({ id:t.id, text:t.text, purpose:g.purpose }); } }
+
+  const now = new Date();
+  const curYear = now.getFullYear(), curMonth = now.getMonth();
+  const completedThisMonth = [];
+  let pendingCount = 0;
+  for(const t of allTreatments){
+    const st = await getState(t.id);
+    if(st.done){
+      if(st.completedDate){
+        const d = new Date(st.completedDate + "T00:00:00");
+        if(d.getFullYear() === curYear && d.getMonth() === curMonth){
+          completedThisMonth.push({ ...t, date: st.completedDate });
+        }
+      }
+    } else {
+      pendingCount++;
+    }
+  }
+  completedThisMonth.sort((a,b) => a.date.localeCompare(b.date));
+
+  document.getElementById("labScanbar").innerHTML = [
+    [allTreatments.length, "追蹤中的實驗條件"],
+    [completedThisMonth.length, "本月已完成"],
+    [pendingCount, "件待排時間", pendingCount>0]
+  ].map(s => `<div class="scanstat"><div class="num${s[2]?' overdue':''}">${s[0]}</div><div class="lbl">${s[1]}</div></div>`).join("");
+
+  const wrap = document.getElementById("labMonthSummary");
+  if(completedThisMonth.length === 0){
+    wrap.innerHTML = `<div class="empty">這個月還沒有標記完成日期的實驗條件——完成的項目打勾後，記得補上完成日期，才會顯示在這裡。</div>`;
+  } else {
+    wrap.innerHTML = completedThisMonth.map(t => {
+      const d = new Date(t.date + "T00:00:00");
+      const w = ["日","一","二","三","四","五","六"][d.getDay()];
+      return `<div class="note-card">
+        <div class="note-title">${d.getMonth()+1}/${d.getDate()}（${w}） － ${t.text}</div>
+        ${t.purpose ? `<div class="note-body" style="font-family:inherit;">${t.purpose}</div>` : ""}
+      </div>`;
+    }).join("");
+  }
+}
+async function renderLabGroupList(){
+  const groups = await getLabGroups();
+  const wrap = document.getElementById("labGroupList");
+  wrap.innerHTML = "";
+  if(groups.length === 0){ wrap.innerHTML = `<div class="empty">尚未新增任何實驗設計。</div>`; return; }
+  for(const g of groups){
+    const card = document.createElement("div");
+    card.className = "group-card";
+    card.innerHTML = `
+      <div class="group-field"><label>實驗目的</label><input type="text" data-g-purpose value="${g.purpose||""}" placeholder="例如：測試抑制劑對 XX 反應的影響"></div>
+      <div class="group-field"><label>對照組／控制組</label><input type="text" data-g-control value="${g.control||""}" placeholder="例如：MCD only"></div>
+      <div class="group-field"><label>備註</label><textarea data-g-note placeholder="任何想記下的觀察…">${g.note||""}</textarea></div>
+      <div class="group-treatments">
+        <div class="glbl">實驗組（待做條件）</div>
+        <div data-g-treatments></div>
+        <div class="add-treatment-row">
+          <input type="text" data-g-newtreatment placeholder="新增條件…">
+          <button class="btn secondary" data-g-addtreatment>＋</button>
+        </div>
+      </div>
+      <div class="group-foot"><span data-g-delete>刪除整組實驗設計</span></div>`;
+    const treatWrap = card.querySelector("[data-g-treatments]");
+    if(g.treatments.length === 0){ treatWrap.innerHTML = `<div class="empty" style="padding:10px;">尚無實驗組。</div>`; }
+    else {
+      for(const t of g.treatments){
+        const item = await renderItem({ id:t.id, subject:t.text, tagInfo:urgencyOf(null),
+          srcLabel:"", srcClass:"", metaLine:"", reason:"", vip:false, showPrep:false, showCompletionDate:true,
+          extraHtml:`<div class="item-meta" style="margin-top:4px;"><span style="cursor:pointer;text-decoration:underline;" data-t-del="${t.id}">刪除此組</span></div>` });
+        item.querySelector(`[data-t-del="${t.id}"]`).addEventListener("click", async () => {
+          const cur = await getLabGroups(); const idx = cur.findIndex(x => x.id === g.id);
+          if(idx>=0){ cur[idx].treatments = cur[idx].treatments.filter(x => x.id !== t.id); await setLabGroups(cur); }
+          showToast("已刪除", `「${t.text}」已從實驗組移除。`);
+          refreshAll();
+        });
+        treatWrap.appendChild(item);
+      }
+    }
+    let ft;
+    const saveFields = () => {
+      clearTimeout(ft);
+      ft = setTimeout(async () => {
+        const cur = await getLabGroups(); const idx = cur.findIndex(x => x.id === g.id);
+        if(idx>=0){
+          cur[idx].purpose = card.querySelector("[data-g-purpose]").value;
+          cur[idx].control = card.querySelector("[data-g-control]").value;
+          cur[idx].note = card.querySelector("[data-g-note]").value;
+          await setLabGroups(cur);
+        }
+      }, 400);
+    };
+    card.querySelector("[data-g-purpose]").addEventListener("input", saveFields);
+    card.querySelector("[data-g-control]").addEventListener("input", saveFields);
+    card.querySelector("[data-g-note]").addEventListener("input", saveFields);
+    const addTreatment = async () => {
+      const input = card.querySelector("[data-g-newtreatment]"); const text = input.value.trim();
+      if(!text) return;
+      const cur = await getLabGroups(); const idx = cur.findIndex(x => x.id === g.id);
+      if(idx>=0){ cur[idx].treatments.push({ id:"t-"+Date.now(), text }); await setLabGroups(cur); }
+      showToast("已新增", `「${text}」已加入實驗組。`);
+      refreshAll();
+    };
+    card.querySelector("[data-g-addtreatment]").addEventListener("click", addTreatment);
+    card.querySelector("[data-g-newtreatment]").addEventListener("keydown", (e) => { if(e.key==="Enter") addTreatment(); });
+    card.querySelector("[data-g-delete]").addEventListener("click", async () => {
+      const cur = await getLabGroups(); await setLabGroups(cur.filter(x => x.id !== g.id));
+      showToast("已刪除", `${g.purpose ? "「"+g.purpose+"」" : "這組"}實驗設計已移除。`);
+      refreshAll();
+    });
+    wrap.appendChild(card);
+  }
+}
+function setupGroupAdd(){
+  document.getElementById("addGroupBtn").addEventListener("click", async () => {
+    const groups = await getLabGroups();
+    groups.push({ id:"grp-"+Date.now(), purpose:"", control:"", note:"", treatments:[] });
+    await setLabGroups(groups);
+    showToast("已新增", "新的實驗設計已加入，可以開始填寫。");
+    renderLabGroupList();
+  });
+}
+async function renderLabNoteList(){
+  const notes = await getLabNotes();
+  const wrap = document.getElementById("labNoteList");
+  wrap.innerHTML = "";
+  if(notes.length === 0){ wrap.innerHTML = `<div class="empty">尚未新增任何方法紀錄。</div>`; return; }
+  for(const n of notes){
+    const card = document.createElement("div");
+    card.className = "note-card";
+    card.innerHTML = `<div class="note-top"><div class="note-title">${n.title}</div><div class="note-del" data-note-del="${n.id}">刪除</div></div><div class="note-body">${n.body}</div>
+      <div class="row" style="margin-top:8px;"><button class="btn secondary block" data-note-protocol="${n.id}">製作標準流程（複製提示詞）</button></div>
+      <div class="status-line" data-note-protocol-status="${n.id}"></div>`;
+    card.querySelector(`[data-note-del="${n.id}"]`).addEventListener("click", async () => {
+      const cur = await getLabNotes(); await setLabNotes(cur.filter(x => x.id !== n.id));
+      showToast("已刪除", `「${n.title}」已移除。`);
+      renderLabNoteList();
+    });
+    card.querySelector(`[data-note-protocol="${n.id}"]`).addEventListener("click", async () => {
+      const status = card.querySelector(`[data-note-protocol-status="${n.id}"]`);
+      await copyPromptToClipboard(buildProtocolPrompt(n.title, n.body), status, "提示詞已複製 — 貼到 Claude App（或其他生成式AI），拿到完整 protocol 後回來這裡跟我對話，我可以幫你存成教學手冊或技能包。");
+    });
+    wrap.appendChild(card);
+  }
+}
+function buildProtocolPrompt(title, body){
+  return `你是一個有臨床毒物與蛇毒蛋白體學研究背景的實驗室助理。以下是一筆新的方法／技術紀錄，請幫我整理成一份正式的標準實驗流程（SOP/protocol），繁體中文，包含：目的、所需材料與試劑、詳細步驟（條列、可重現）、注意事項／常見誤差來源。直接輸出 protocol 全文，不要其他說明文字。
+標題：${title}
+內容：
+---
+${body}
+---`;
+}
+function buildWorkflowPrompt(meetingSubject, summary, items){
+  const itemLines = items.map(it => `- ${it.task || it.subject}（負責人：${it.owner||"未指定"}）`).join("\n");
+  return `你是一個熟悉醫院/單位行政流程設計的助理。以下是一場會議決議出的行動項目，請幫我整理成一份正式的單位工作流程（SOP/workflow），繁體中文，包含：流程目的、適用範圍、權責分工（依下列負責人）、詳細執行步驟（條列、可依循）、需要的表單或文件（如有）、注意事項。直接輸出流程文件全文，不要其他說明文字。
+會議主旨：${meetingSubject}
+會議摘要：${summary || "（無）"}
+行動項目：
+${itemLines}`;
+}
+function labProtocolPromptHtml(title, body){
+  return `<div class="prep-box" style="margin-top:10px;">
+      <div class="lbl"><span>這是新技術嗎？是否需要製作標準實驗流程（protocol）？</span></div>
+      <div class="row" style="margin-top:6px;">
+        <button class="btn secondary" id="labProtocolYesBtn">是，複製提示詞</button>
+        <button class="btn secondary" id="labProtocolNoBtn">不用</button>
+      </div>
+      <div class="status-line" id="labProtocolStatus"></div>
+    </div>`;
+}
+function wireLabProtocolPrompt(title, body){
+  const box = document.getElementById("labProtocolPrompt");
+  box.innerHTML = labProtocolPromptHtml(title, body);
+  const status = document.getElementById("labProtocolStatus");
+  document.getElementById("labProtocolYesBtn").addEventListener("click", async () => {
+    await copyPromptToClipboard(buildProtocolPrompt(title, body), status, "提示詞已複製 — 貼到 Claude App（或其他生成式AI），拿到完整 protocol 後回來這裡跟我對話，我可以幫你存成教學手冊或技能包。");
+  });
+  document.getElementById("labProtocolNoBtn").addEventListener("click", () => {
+    box.innerHTML = "";
+  });
+}
+function setupLabTab(){
+  setupSingleCalc(); setupSerialCalc(); setupGroupAdd();
+  document.getElementById("labNoteAddBtn").addEventListener("click", async () => {
+    const titleInput = document.getElementById("labNoteTitle"), bodyInput = document.getElementById("labNoteBody");
+    const title = titleInput.value.trim(), body = bodyInput.value.trim();
+    if(!title && !body) return;
+    const notes = await getLabNotes();
+    notes.unshift({ id:"note-"+Date.now(), title: title||"（未命名）", body });
+    await setLabNotes(notes);
+    showToast("已新增", `「${title||"（未命名）"}」已加入方法紀錄。`);
+    wireLabProtocolPrompt(title||"（未命名）", body);
+    titleInput.value=""; bodyInput.value=""; renderLabNoteList();
+  });
+  document.getElementById("labSuggestBtn").addEventListener("click", async () => {
+    const resultText = document.getElementById("labResultInput").value.trim();
+    const status = document.getElementById("labSuggestStatus");
+    if(!resultText){ status.textContent = "請先描述今天的實驗結果或觀察。"; status.className = "status-line err"; return; }
+    const prompt = `你是研究助理。以下是今天的實驗結果，請建議 2-4 個值得接著測試的條件組合，只回傳 JSON 陣列，每個元素20字內，不要其他文字：\n["建議一","建議二"]\n結果：\n---\n${resultText}\n---`;
+    await copyPromptToClipboard(prompt, status);
+  });
+  document.getElementById("labParseReplyBtn").addEventListener("click", async () => {
+    const status = document.getElementById("labParseStatus"), box = document.getElementById("labSuggestions");
+    const replyInput = document.getElementById("labAiReplyInput");
+    try {
+      const suggestions = parseAIJson(replyInput.value);
+      const groups = await getLabGroups();
+      box.innerHTML = "";
+      suggestions.forEach(s => {
+        const chip = document.createElement("div");
+        chip.className = "suggestion-chip";
+        const groupOptions = groups.map(g => `<option value="${g.id}">${g.purpose || "（未命名）"}</option>`).join("");
+        chip.innerHTML = `<span style="flex:1;">${s}</span><select>${groupOptions}<option value="__new__">＋新建</option></select><button>加入</button>`;
+        chip.querySelector("button").addEventListener("click", async () => {
+          const select = chip.querySelector("select");
+          const cur = await getLabGroups();
+          if(select.value === "__new__" || cur.length === 0){
+            cur.push({ id:"grp-"+Date.now(), purpose:"", control:"", note:"", treatments:[{ id:"t-"+Date.now(), text:s }] });
+          } else {
+            const idx = cur.findIndex(x => x.id === select.value);
+            if(idx>=0) cur[idx].treatments.push({ id:"t-"+Date.now(), text:s });
+          }
+          await setLabGroups(cur); chip.remove();
+          showToast("已新增", `「${s}」已加入實驗組。`);
+          refreshAll();
+        });
+        box.appendChild(chip);
+      });
+      status.className = "status-line";
+      status.textContent = suggestions.length ? "選擇要加入哪一組，再按「加入」。" : "沒有產生建議。";
+      replyInput.value = "";
+    } catch(err){
+      status.className = "status-line err";
+      status.textContent = friendlyErrorMessage(err);
+    }
+  });
+}
+
+/* ================= nav / settings / init ================= */
+function switchPanel(name){
+  document.querySelectorAll(".navitem").forEach(el => el.classList.toggle("active", el.dataset.panel === name));
+  document.querySelectorAll(".panel").forEach(el => el.classList.toggle("active", el.id === "panel-"+name));
+  window.scrollTo(0,0);
+}
+function setupNav(){
+  document.querySelectorAll(".navitem").forEach(el => el.addEventListener("click", () => switchPanel(el.dataset.panel)));
+}
+function setupSettings(){
+  const overlay = document.getElementById("settingsOverlay");
+  document.getElementById("settingsBtn").addEventListener("click", () => overlay.classList.add("open"));
+  document.getElementById("settingsCloseBtn").addEventListener("click", () => overlay.classList.remove("open"));
+  overlay.addEventListener("click", (e) => { if(e.target === overlay) overlay.classList.remove("open"); });
+
+  document.querySelectorAll(".theme-opt").forEach(el => el.addEventListener("click", async () => {
+    const theme = el.dataset.themeChoice;
+    applyTheme(theme); await setTheme(theme);
+  }));
+
+  document.getElementById("exportBackupBtn").addEventListener("click", async () => {
+    const status = document.getElementById("backupStatus");
+    try {
+      const keys = await secStorage.list();
+      const data = {};
+      for(const k of keys){
+        const r = await secStorage.get(k);
+        if(r) data[k] = r.value;
+      }
+      const payload = { exportedAt: new Date().toISOString(), app: "隨身秘書", data };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const today = new Date();
+      const dstr = `${today.getFullYear()}${String(today.getMonth()+1).padStart(2,"0")}${String(today.getDate()).padStart(2,"0")}`;
+      a.href = url; a.download = `隨身秘書備份-${dstr}.json`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      status.className = "status-line";
+      status.textContent = `已匯出 ${keys.length} 筆資料，請把下載的檔案存到雲端硬碟或其他安全的地方。`;
+      showToast("備份已下載", "建議把這個檔案存到雲端硬碟，換裝置時可以用「匯入備份」還原。");
+    } catch(err){
+      status.className = "status-line err";
+      status.textContent = "匯出失敗：" + friendlyErrorMessage(err);
+    }
+  });
+
+  document.getElementById("importBackupBtn").addEventListener("click", async () => {
+    const status = document.getElementById("backupStatus");
+    const fileInput = document.getElementById("importBackupFile");
+    const file = fileInput.files[0];
+    if(!file){ status.className = "status-line err"; status.textContent = "請先選擇備份檔案。"; return; }
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const payload = JSON.parse(reader.result);
+        if(!payload || typeof payload.data !== "object"){
+          status.className = "status-line err"; status.textContent = "這個檔案格式看起來不是本工具的備份檔。";
+          return;
+        }
+        const entries = Object.entries(payload.data);
+        for(const [k, v] of entries){ await secStorage.set(k, v); }
+        status.className = "status-line";
+        status.textContent = `已還原 ${entries.length} 筆資料，正在重新整理畫面…`;
+        refreshAll();
+        showToast("備份已還原", `已匯入 ${entries.length} 筆資料。`);
+      } catch(err){
+        status.className = "status-line err";
+        status.textContent = "匯入失敗：" + friendlyErrorMessage(err);
+      }
+    };
+    reader.readAsText(file);
+  });
+}
+// If any render step throws (for any reason — including ones I can't
+// reproduce locally), this surfaces the actual error on-screen with a copy
+// button instead of failing silently and leaving lists half-cleared.
+function showDebugError(context, err){
+  const banner = document.getElementById("debugErrorBanner");
+  const msg = (err && err.stack) ? err.stack : String(err);
+  banner.style.display = "block";
+  banner.innerHTML = `<div class="debug-banner">
+    <div class="db-title">出了一個非預期的錯誤（${context}）</div>
+    <div>畫面上的資料應該還在，只是這次刷新沒完成。麻煩把下面這段完整複製給我：</div>
+    <pre id="debugErrorText">${msg.replace(/</g,"&lt;")}</pre>
+    <button id="debugErrorCopyBtn">複製錯誤內容</button>
+  </div>`;
+  document.getElementById("debugErrorCopyBtn").addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(msg); document.getElementById("debugErrorCopyBtn").textContent = "已複製"; } catch(e){}
+  });
+}
+// Counts overdue/urgent, not-yet-done tracked items (公文 + 行動項目) and
+// shows the number as a small badge on the 公文 nav icon, so you can see at
+// a glance whether anything needs attention without opening the tab.
+async function updateDocsBadge(){
+  const tracked = await getTracked();
+  let count = 0;
+  for(const d of tracked){
+    const tier = urgencyOf(d.offset).tier;
+    if(tier !== "overdue" && tier !== "urgent") continue;
+    const state = await getState(d.id);
+    if(!state.done) count++;
+  }
+  const badge = document.getElementById("docsBadge");
+  if(count > 0){ badge.textContent = count > 99 ? "99+" : String(count); badge.style.display = "inline-block"; }
+  else { badge.style.display = "none"; }
+}
+async function refreshAll(){
+  try {
+    await renderDecisionCards();
+    await renderDaily();
+    await renderWeekly();
+    await renderCustomEventList();
+    await renderDocList();
+    await updateDocsBadge();
+    await renderLabMonthSummary();
+    await renderLabGroupList();
+    await renderLabNoteList();
+  } catch(err){
+    showDebugError("refreshAll", err);
+  }
+}
+/* ================= 週報／月報 ================= */
+// Extracts a Date.now()-style timestamp from an id like "doc-1755300000000"
+// or "action-1755300000000-2", for records saved before the explicit
+// createdAt field existed — lets old data still show up in period reports
+// instead of being silently excluded.
+function parseIdTime(id){
+  const m = String(id||"").match(/(\d{13})/);
+  return m ? parseInt(m[1], 10) : null;
+}
+function timeOf(item){
+  if(typeof item.createdAt === "number") return item.createdAt;
+  const t = parseIdTime(item.id);
+  return t || null;
+}
+function getPeriodBounds(type){
+  const now = new Date();
+  if(type === "week"){
+    const day = now.getDay(); // 0=Sun..6=Sat
+    const diffToMon = (day === 0 ? 6 : day - 1);
+    const curStart = new Date(now); curStart.setHours(0,0,0,0); curStart.setDate(curStart.getDate() - diffToMon);
+    const curEnd = new Date(curStart); curEnd.setDate(curEnd.getDate() + 7); // end of this calendar week (next Monday, exclusive)
+    const prevStart = new Date(curStart); prevStart.setDate(prevStart.getDate() - 7);
+    return { curStart, curEnd, prevStart, prevEnd: curStart, label: "本週" };
+  } else {
+    const curStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const curEnd = new Date(now.getFullYear(), now.getMonth()+1, 1); // start of next month = end of this month, exclusive
+    const prevStart = new Date(now.getFullYear(), now.getMonth()-1, 1);
+    return { curStart, curEnd, prevStart, prevEnd: curStart, label: "本月" };
+  }
+}
+function inRange(ts, start, end){ return typeof ts === "number" && ts >= start.getTime() && ts < end.getTime(); }
+
+async function computeReportData(type){
+  const bounds = getPeriodBounds(type);
+  const tracked = await getTracked();
+  const labNotes = await getLabNotes();
+  const allKeys = await secStorage.list();
+  const transitKeys = allKeys.filter(k => k.startsWith("secretary-transit:"));
+  const transitStates = [];
+  for(const k of transitKeys){
+    const r = await secStorage.get(k);
+    if(r){ try { transitStates.push(JSON.parse(r.value)); } catch(e){} }
+  }
+
+  const countInPeriod = (list, start, end) => list.filter(x => inRange(timeOf(x), start, end)).length;
+  const docsCur = countInPeriod(tracked.filter(d=>d.kind!=="action"), bounds.curStart, bounds.curEnd);
+  const docsPrev = countInPeriod(tracked.filter(d=>d.kind!=="action"), bounds.prevStart, bounds.prevEnd);
+  const actionsCur = countInPeriod(tracked.filter(d=>d.kind==="action"), bounds.curStart, bounds.curEnd);
+  const actionsPrev = countInPeriod(tracked.filter(d=>d.kind==="action"), bounds.prevStart, bounds.prevEnd);
+  const notesCur = countInPeriod(labNotes, bounds.curStart, bounds.curEnd);
+  const notesPrev = countInPeriod(labNotes, bounds.prevStart, bounds.prevEnd);
+
+  const sumAmount = (states, start, end) => states.reduce((sum, s) => {
+    if(!s.reimburseDate || !s.amount) return sum;
+    const t = new Date(s.reimburseDate + "T00:00:00").getTime();
+    if(t >= start.getTime() && t < end.getTime()){ const n = parseFloat(s.amount); return sum + (isNaN(n)?0:n); }
+    return sum;
+  }, 0);
+  const amountCur = sumAmount(transitStates, bounds.curStart, bounds.curEnd);
+  const amountPrev = sumAmount(transitStates, bounds.prevStart, bounds.prevEnd);
+
+  // Snapshot metrics — "as of right now", not tied to the period, since due
+  // dates are stored as a relative day-offset from when they were analyzed
+  // rather than an absolute date, so there's no reliable way to reconstruct
+  // "how many were overdue as of last week" after the fact.
+  let overdueCount = 0, doneCount = 0;
+  for(const d of tracked){
+    const s = await getState(d.id);
+    if(!s.done && urgencyOf(d.offset).tier === "overdue") overdueCount++;
+    if(s.done) doneCount++;
+  }
+  const completionRate = tracked.length ? Math.round((doneCount/tracked.length)*100) : null;
+
+  const ownerLoad = {};
+  for(const d of tracked){
+    if(d.kind !== "action") continue;
+    const s = await getState(d.id);
+    if(s.done) continue;
+    const owner = d.owner || "未指定";
+    ownerLoad[owner] = (ownerLoad[owner]||0) + 1;
+  }
+
+  return { bounds, docsCur, docsPrev, actionsCur, actionsPrev, notesCur, notesPrev, amountCur, amountPrev,
+    overdueCount, doneCount, totalTracked: tracked.length, completionRate, ownerLoad };
+}
+
+function pctDelta(cur, prev){
+  if(prev === 0) return cur === 0 ? { text:"與上期持平", cls:"flat" } : { text:"上期為 0", cls:"up" };
+  const pct = Math.round(((cur-prev)/prev)*100);
+  if(pct === 0) return { text:"與上期持平", cls:"flat" };
+  return { text:`${pct>0?"↑":"↓"} ${Math.abs(pct)}% 較上期`, cls: pct>0 ? "up" : "down" };
+}
+function statCardHtml(label, value, delta){
+  return `<div class="stat-card"><div class="stat-label">${label}</div><div class="stat-value">${value}</div>${delta ? `<div class="stat-delta ${delta.cls}">${delta.text}</div>` : ""}</div>`;
+}
+// Small dependency-free bar chart drawn directly on <canvas> — deliberately
+// not using a CDN charting library. This report needs to work the moment
+// the page is published as a static site, and a canvas drawn with the
+// native 2D API has zero load-time, zero external dependency, and nothing
+// that can silently fail to load.
+function drawComparisonBarChart(canvas, categories, curValues, prevValues, curLabel, prevLabel){
+  const dpr = window.devicePixelRatio || 1;
+  const cssW = canvas.clientWidth || 300, cssH = 180;
+  canvas.width = cssW*dpr; canvas.height = cssH*dpr;
+  canvas.style.height = cssH+"px";
+  const ctx = canvas.getContext("2d");
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0,0,cssW,cssH);
+  const maxVal = Math.max(1, ...curValues, ...prevValues);
+  const padLeft = 8, padRight = 8, padTop = 16, padBottom = 28;
+  const chartW = cssW - padLeft - padRight, chartH = cssH - padTop - padBottom;
+  const groupW = chartW / categories.length;
+  const barW = Math.min(28, groupW/3.2);
+  const styles = getComputedStyle(document.documentElement);
+  const curColor = styles.getPropertyValue("--mark-c").trim() || "#333";
+  const prevColor = styles.getPropertyValue("--rule").trim() || "#ccc";
+  const inkColor = styles.getPropertyValue("--ink").trim() || "#111";
+  ctx.font = "11px -apple-system,sans-serif";
+  categories.forEach((cat, i) => {
+    const gx = padLeft + i*groupW + groupW/2;
+    const curH = (curValues[i]/maxVal) * chartH;
+    const prevH = (prevValues[i]/maxVal) * chartH;
+    ctx.fillStyle = prevColor;
+    ctx.fillRect(gx - barW - 3, padTop + chartH - prevH, barW, prevH);
+    ctx.fillStyle = curColor;
+    ctx.fillRect(gx + 3, padTop + chartH - curH, barW, curH);
+    ctx.fillStyle = inkColor;
+    ctx.textAlign = "center";
+    ctx.fillText(String(curValues[i]), gx + 3 + barW/2, padTop + chartH - curH - 4);
+    ctx.fillText(String(prevValues[i]), gx - barW - 3 + barW/2, padTop + chartH - prevH - 4);
+    ctx.fillStyle = inkColor;
+    ctx.fillText(cat, gx, cssH - 8);
+  });
+  // legend
+  ctx.textAlign = "left";
+  ctx.fillStyle = curColor; ctx.fillRect(padLeft, 2, 9, 9);
+  ctx.fillStyle = inkColor; ctx.fillText(curLabel, padLeft+13, 10.5);
+  ctx.fillStyle = prevColor; ctx.fillRect(padLeft+70, 2, 9, 9);
+  ctx.fillStyle = inkColor; ctx.fillText(prevLabel, padLeft+83, 10.5);
+}
+function drawOwnerLoadChart(canvas, ownerLoad){
+  const entries = Object.entries(ownerLoad).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const dpr = window.devicePixelRatio || 1;
+  const cssW = canvas.clientWidth || 300, rowH = 22, cssH = Math.max(60, entries.length*rowH + 12);
+  canvas.width = cssW*dpr; canvas.height = cssH*dpr;
+  canvas.style.height = cssH+"px";
+  const ctx = canvas.getContext("2d");
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0,0,cssW,cssH);
+  if(entries.length === 0){
+    ctx.font = "12px -apple-system,sans-serif";
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--ink-faint").trim() || "#999";
+    ctx.fillText("目前沒有未完成的行動項目", 4, 20);
+    return;
+  }
+  const maxVal = Math.max(1, ...entries.map(e=>e[1]));
+  const styles = getComputedStyle(document.documentElement);
+  const barColor = styles.getPropertyValue("--mark-c").trim() || "#333";
+  const inkColor = styles.getPropertyValue("--ink").trim() || "#111";
+  const labelW = 64, barMaxW = cssW - labelW - 30;
+  ctx.font = "11.5px -apple-system,sans-serif";
+  entries.forEach(([owner, count], i) => {
+    const y = i*rowH + 6;
+    ctx.fillStyle = inkColor; ctx.textAlign = "left";
+    const shortName = owner.length > 6 ? owner.slice(0,6)+"…" : owner;
+    ctx.fillText(shortName, 0, y+11);
+    const w = (count/maxVal) * barMaxW;
+    ctx.fillStyle = barColor;
+    ctx.fillRect(labelW, y, w, 14);
+    ctx.fillStyle = inkColor;
+    ctx.fillText(String(count), labelW + w + 6, y+11);
+  });
+}
+
+async function renderReport(type){
+  document.getElementById("reportWeekBtn").classList.toggle("active", type === "week");
+  document.getElementById("reportMonthBtn").classList.toggle("active", type === "month");
+  const data = await computeReportData(type);
+  const b = data.bounds;
+  const fmt = (n) => n.toLocaleString("zh-Hant");
+  const money = (n) => n.toLocaleString("zh-Hant", { maximumFractionDigits: 0 });
+  const fmtDate = (d) => `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
+  const displayEnd = new Date(b.curEnd.getTime() - 1); // curEnd is an exclusive bound (start of next period) — show the actual last day instead
+  document.getElementById("reportTitle").textContent = `${b.label}報表（${fmtDate(b.curStart)} – ${fmtDate(displayEnd)}）`;
+
+  const body = document.getElementById("reportBody");
+  body.innerHTML = `
+    <div class="report-section">
+      <div class="report-section-title">公文與行動項目量能</div>
+      <div class="stat-grid">
+        ${statCardHtml("新增公文", fmt(data.docsCur), pctDelta(data.docsCur, data.docsPrev))}
+        ${statCardHtml("新增行動項目", fmt(data.actionsCur), pctDelta(data.actionsCur, data.actionsPrev))}
+      </div>
+      <div class="report-chart-wrap"><canvas id="reportVolumeChart"></canvas></div>
+    </div>
+    <div class="report-section">
+      <div class="report-section-title">目前狀態（即時快照，非本期歷史數字）</div>
+      <div class="stat-grid">
+        ${statCardHtml("目前逾期未結", fmt(data.overdueCount), null)}
+        ${statCardHtml("整體完成率", data.completionRate===null ? "－" : data.completionRate+"%", null)}
+      </div>
+    </div>
+    <div class="report-section">
+      <div class="report-section-title">行動項目負責人分佈（未完成，依人力負荷排序）</div>
+      <div class="report-chart-wrap"><canvas id="reportOwnerChart"></canvas></div>
+    </div>
+    <div class="report-section">
+      <div class="report-section-title">交通核銷金額</div>
+      <div class="stat-grid">
+        ${statCardHtml(`${b.label}核銷總額`, "$"+money(data.amountCur), pctDelta(data.amountCur, data.amountPrev))}
+        ${statCardHtml("上期核銷總額", "$"+money(data.amountPrev), null)}
+      </div>
+      ${data.amountCur===0 && data.amountPrev===0 ? `<div class="report-empty-note">尚未登記任何核銷金額（在公文以外的行程「交通核銷」欄位可填寫金額）。</div>` : ""}
+    </div>
+    <div class="report-section">
+      <div class="report-section-title">實驗方法紀錄</div>
+      <div class="stat-grid">
+        ${statCardHtml("新增方法紀錄", fmt(data.notesCur), pctDelta(data.notesCur, data.notesPrev))}
+      </div>
+    </div>
+  `;
+  drawComparisonBarChart(document.getElementById("reportVolumeChart"),
+    ["公文","行動項目"], [data.docsCur, data.actionsCur], [data.docsPrev, data.actionsPrev], b.label, "上期");
+  drawOwnerLoadChart(document.getElementById("reportOwnerChart"), data.ownerLoad);
+}
+function setupReport(){
+  const overlay = document.getElementById("reportOverlay");
+  document.getElementById("openReportBtn").addEventListener("click", async () => {
+    overlay.classList.add("open");
+    await renderReport("week");
+  });
+  document.getElementById("reportCloseBtn").addEventListener("click", () => overlay.classList.remove("open"));
+  overlay.addEventListener("click", (e) => { if(e.target === overlay) overlay.classList.remove("open"); });
+  document.getElementById("reportWeekBtn").addEventListener("click", () => renderReport("week"));
+  document.getElementById("reportMonthBtn").addEventListener("click", () => renderReport("month"));
+  document.getElementById("reportDownloadPdfBtn").addEventListener("click", () => {
+    // Deliberately using the browser's native print-to-PDF instead of a
+    // CDN-loaded PDF library (e.g. jsPDF): this report needs to work
+    // reliably the moment the page is published as a static site, and
+    // window.print() has zero external dependency and zero load-time
+    // failure mode — the person picks "Save as PDF" in the print dialog,
+    // which every modern desktop and mobile browser supports natively.
+    window.print();
+  });
+}
+
+async function init(){
+  const theme = await getTheme();
+  applyTheme(theme);
+  document.getElementById("brandMark").innerHTML = brandMarkSvgMarkup() + '<span class="brand-name">隨身秘書</span>';
+
+  const d = new Date();
+  const w = ["日","一","二","三","四","五","六"][d.getDay()];
+  document.getElementById("todayDate").textContent = `${d.getFullYear()} 年 ${d.getMonth()+1} 月 ${d.getDate()} 日 星期${w}`;
+  document.getElementById("footerText").innerHTML = `隨身秘書 · 行事曆／公文／實驗資料僅存在本裝置<br>Designed by Carol Lee © ${d.getFullYear()}`;
+  setGreeting();
+
+  const homeCityInput = document.getElementById("homeCityInput");
+  homeCityInput.value = await getHomeCity();
+  let ct;
+  homeCityInput.addEventListener("input", () => {
+    clearTimeout(ct);
+    ct = setTimeout(async () => { await setHomeCity(homeCityInput.value.trim() || "台北"); refreshAll(); }, 500);
+  });
+
+  const vipInput = document.getElementById("vipInput");
+  vipInput.value = await getVipList();
+  let vt;
+  vipInput.addEventListener("input", () => {
+    clearTimeout(vt);
+    vt = setTimeout(async () => { await setVipList(vipInput.value); refreshAll(); }, 500);
+  });
+
+  const replySigInput = document.getElementById("replySignatureInput");
+  replySigInput.value = await getReplySignature();
+  let rst;
+  replySigInput.addEventListener("input", () => {
+    clearTimeout(rst);
+    rst = setTimeout(async () => { await setReplySignature(replySigInput.value); }, 500);
+  });
+
+  document.getElementById("refreshBriefingBtn").addEventListener("click", async () => {
+    const btn = document.getElementById("refreshBriefingBtn");
+    const original = btn.textContent;
+    btn.disabled = true; btn.textContent = "更新中…";
+    try { await refreshAll(); } finally {
+      btn.textContent = "✓ 已更新";
+      setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 1200);
+    }
+  });
+
+  setupNav();
+  setupSettings();
+  setupReport();
+  setupDocUpload();
+  setupLabTab();
+  setupCalendarImport();
+  setupCalGridNav();
+  setupMailReminderDelegation();
+  await ensureLabSeed();
+  await migrateStatesIfNeeded();
+  await ensureRealCalendarSeed();
+  await applyDataFixups();
+  await refreshAll();
+  await renderCustomEventList();
+}
+init();
+</script>
+</body>
+</html>
